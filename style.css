@@ -1,0 +1,157 @@
+:root {
+  --bg-color: #f2f0eb;
+  --text-color: #2b2b2b;
+  --card-bg: #ffffff;
+  --header-bg: #1a1a1a;
+  --accent-color: #bf3636;
+  --border-color: #c4c0b9;
+  --muted-text: #595959;
+  --input-bg: #ffffff;
+}
+
+body.dark-mode {
+  --bg-color: #1a1a1a;
+  --text-color: #e8e8e8;
+  --card-bg: #242424;
+  --header-bg: #0d0d0d;
+  --accent-color: #d9534f;
+  --border-color: #404040;
+  --muted-text: #8c8c8c;
+  --input-bg: #1f1f1f;
+}
+
+body { 
+  font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "BIZ UDPGothic", Meiryo, sans-serif; 
+  background-color: var(--bg-color); 
+  color: var(--text-color); 
+  margin: 0; 
+  padding: 0; 
+  transition: background-color 0.2s; 
+  line-height: 1.6;
+}
+
+.header { 
+  background-color: var(--header-bg); 
+  color: #fdfdfd; 
+  padding: 12px 20px; 
+  font-weight: bold; 
+  position: sticky; 
+  top: 0; 
+  z-index: 10; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  border-bottom: 3px solid var(--accent-color);
+}
+.header-left { display: flex; align-items: center; }
+.header-logo { height: 40px; width: 40px; margin-right: 16px; object-fit: contain; background: white; border-radius: 50%; padding: 2px;}
+
+.breadcrumb { font-size: 12px; color: #a3a3a3; margin-bottom: 2px;}
+.breadcrumb-link { cursor: pointer; transition: color 0.2s; }
+.breadcrumb-link:hover { color: #ffffff; text-decoration: underline; }
+
+.container { padding: 20px; max-width: 1200px; margin: 0 auto;}
+
+.card { 
+  background: var(--card-bg); 
+  padding: 20px; 
+  border-radius: 2px; 
+  margin-bottom: 16px; 
+  border: 1px solid var(--border-color);
+  box-shadow: 2px 2px 0px rgba(0,0,0,0.05); 
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.card:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0px rgba(0,0,0,0.05); }
+.card-no-click { cursor: default; }
+.card-no-click:active { transform: none; box-shadow: 2px 2px 0px rgba(0,0,0,0.05); }
+
+/* 映画一覧のカードを横並びに整えます */
+.movie-list-item { display: flex; justify-content: space-between; align-items: center; }
+.movie-info { flex: 1; cursor: pointer; }
+.participation-toggle { 
+  background-color: var(--card-bg); color: var(--muted-text); border: 2px solid var(--border-color); 
+  padding: 6px 12px; width: auto; margin: 0 0 0 16px; border-radius: 20px; font-size: 12px;
+}
+.participation-toggle.active { background-color: #e8f5e9; color: #2e7d32; border-color: #2e7d32; }
+body.dark-mode .participation-toggle.active { background-color: #1b4d20; color: #c8e6c9; border-color: #c8e6c9;}
+
+input[type="text"], input[type="number"], select, textarea { 
+  width: 100%; padding: 8px 10px; margin: 8px 0; border: 1px solid var(--border-color); 
+  border-radius: 0; box-sizing: border-box; font-size: 14px; background-color: var(--input-bg); color: var(--text-color);
+}
+input[type="file"] { margin: 8px 0; color: var(--text-color); font-size: 13px;}
+
+.date-dial-container { display: flex; gap: 8px; align-items: center; margin: 4px 0 12px 0; }
+.date-dial-container select { flex: 1; padding: 8px 4px; text-align: center;}
+.input-label { font-size: 12px; color: var(--muted-text); display: block; margin-top: 12px; font-weight: bold;}
+
+.sort-filter-bar { display: flex; gap: 8px; }
+.sort-filter-bar select { width: auto; padding: 4px 24px 4px 8px; margin: 0; font-size: 12px; cursor: pointer;}
+
+button { 
+  background-color: var(--text-color); color: var(--bg-color); border: 1px solid var(--text-color); 
+  padding: 10px 16px; border-radius: 2px; cursor: pointer; font-size: 14px; width: 100%; margin-top: 8px; font-weight: bold; letter-spacing: 1px;
+}
+button:hover { opacity: 0.9; }
+button.secondary { background-color: transparent; color: var(--text-color); margin-top: 16px;}
+button.sticky-back-btn { margin-top: 0; margin-bottom: 24px; border: 2px dashed var(--border-color); color: var(--muted-text); }
+button.danger { background-color: transparent; color: var(--accent-color); border: 1px solid var(--accent-color); margin-top: 24px;}
+button.close-btn { background-color: var(--border-color); color: var(--text-color); border:none; margin-bottom: 16px; margin-top: 0;}
+body.dark-mode button.close-btn { background-color: #333; color: #ddd; }
+
+.view-toggles { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; border-bottom: 2px solid var(--border-color); padding-bottom: 4px;}
+.view-toggles button { flex: 1; min-width: 110px; background-color: transparent; border: 1px solid transparent; color: var(--muted-text); margin: 0; padding: 6px; font-size: 13px; border-radius: 4px 4px 0 0;}
+.view-toggles button.active { background-color: var(--border-color); color: var(--text-color); border: 1px solid var(--border-color); font-weight: bold;}
+body.dark-mode .view-toggles button.active { background-color: #333; color: #fff; border-color: #333;}
+
+button:disabled { background-color: transparent; color: var(--border-color); border-color: var(--border-color); cursor: not-allowed;}
+button.icon-btn { width: auto; padding: 4px 8px; margin: 0; background-color: transparent; border: 1px solid #555; color: white; border-radius: 2px;}
+
+.hidden { display: none !important; }
+h2 { margin-top: 0; font-size: 20px; color: var(--text-color); border-left: 4px solid var(--header-bg); padding-left: 8px;}
+h3 { margin-top: 0; font-size: 16px; color: var(--text-color); border-bottom: 1px solid var(--border-color); padding-bottom: 4px;}
+
+.status-badge, select.status-color { display: inline-block; padding: 2px 6px; border-radius: 2px; font-size: 12px; font-weight: bold; margin-right: 4px; margin-top: 4px;}
+select.status-color { width: 100%; font-size: 14px; padding: 8px; margin: 8px 0;}
+
+.status-未着手 { background-color: transparent; color: #a82e2e; border: 1px solid #a82e2e !important;}
+.status-準備中 { background-color: transparent; color: #b5651d; border: 1px solid #b5651d !important;}
+.status-準備完了 { background-color: transparent; color: #2e7d32; border: 1px solid #2e7d32 !important;}
+.status-使用済み { background-color: transparent; color: #1565c0; border: 1px solid #1565c0 !important;}
+
+body.dark-mode .status-未着手 { color: #ff8a8a; border-color: #ff8a8a !important;}
+body.dark-mode .status-準備中 { color: #ffb74d; border-color: #ffb74d !important;}
+body.dark-mode .status-準備完了 { color: #81c784; border-color: #81c784 !important;}
+body.dark-mode .status-使用済み { color: #64b5f6; border-color: #64b5f6 !important;}
+
+.cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px;}
+.cal-header button { width: auto; padding: 4px 12px; margin: 0; background: transparent; color: var(--text-color); border: 1px solid var(--border-color);}
+.calendar-table { width: 100%; border-collapse: collapse; background: var(--card-bg); table-layout: fixed; border: 2px solid var(--border-color);}
+.calendar-table th { background: var(--border-color); color: var(--text-color); padding: 4px; font-size: 12px; font-weight: bold; border: 1px solid var(--border-color);}
+body.dark-mode .calendar-table th { background: #333; }
+.calendar-table td { border: 1px solid var(--border-color); height: 80px; vertical-align: top; padding: 4px; box-sizing: border-box;}
+.cal-day-num { font-size: 12px; color: var(--muted-text); display: block; margin-bottom: 2px; text-align: left;}
+.cal-marker { font-size: 11px; color: var(--text-color); cursor: pointer; display: block; padding: 2px 4px; margin-bottom: 2px; background-color: rgba(0,0,0,0.04); border-left: 2px solid var(--header-bg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.cal-marker:hover { background-color: rgba(0,0,0,0.08); font-weight: bold;}
+body.dark-mode .cal-marker { background-color: rgba(255,255,255,0.05); border-left: 2px solid #888;}
+
+.scene-info { font-size: 13px; color: var(--muted-text); margin-top: 6px; line-height: 1.5;}
+.section-title { margin-top: 0; margin-bottom: 0; font-weight: bold;}
+.inventory-header { border-left: 3px solid var(--accent-color); padding-left: 8px; margin-top: 24px; font-size: 15px; background: rgba(0,0,0,0.03); padding-top: 4px; padding-bottom: 4px;}
+body.dark-mode .inventory-header { background: rgba(255,255,255,0.05); }
+
+.split-layout { display: flex; gap: 24px; align-items: flex-start; }
+.list-pane { flex: 1; min-width: 0; }
+.detail-pane { display: none; flex: 1; min-width: 0; position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; padding-right: 8px;}
+.detail-pane::-webkit-scrollbar { width: 8px; }
+.detail-pane::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 0; border: 1px solid var(--bg-color);}
+
+@media (min-width: 800px) {
+  .detail-pane.show-detail { display: block; animation: nyoki 0.2s ease-out forwards; }
+}
+@media (max-width: 799px) {
+  .split-layout { flex-direction: column; }
+  .detail-pane.show-detail { display: block; max-height: none; overflow-y: visible; }
+  .list-pane.hide-on-mobile { display: none; }
+}
+@keyframes nyoki { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
