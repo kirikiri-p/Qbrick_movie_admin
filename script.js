@@ -21,38 +21,55 @@ let currentSceneId = null;
 let currentViewMode = 'list'; 
 let currentSort = 'num-asc'; 
 let selectedSceneIds = new Set(); 
-let lastViewBeforeDetail = null; 
+let lastViewHash = 'home'; // 🌟 ルーティング用の履歴です
 
 let isEditorMode = false;
 let globalCalYear = new Date().getFullYear();
 let globalCalMonth = new Date().getMonth();
 
 function migrateSceneData(scene) {
-  if (scene.date && !scene.dates) {
-    scene.dates = [scene.date];
-  } else if (!scene.dates) {
-    scene.dates = [];
-  }
-
+  if (scene.date && !scene.dates) { scene.dates = [scene.date]; } else if (!scene.dates) { scene.dates = []; }
   if (!scene.costumes) {
     scene.costumes = [];
-    if (scene.costumeName) {
-      scene.costumeName.split(',').forEach((name, i) => {
-        if(name.trim()) scene.costumes.push({ id: 'c' + Date.now() + i, name: name.trim(), status: scene.costumeStatus || '未着手', desc: scene.costumeDesc || '', price: scene.costumePrice || '' });
-      });
-    }
+    if (scene.costumeName) { scene.costumeName.split(',').forEach((n, i) => { if(n.trim()) scene.costumes.push({ id: 'c'+Date.now()+i, name: n.trim(), status: scene.costumeStatus||'未着手', desc: scene.costumeDesc||'', price: scene.costumePrice||'' }); }); }
   }
   if (!scene.props) {
     scene.props = [];
-    if (scene.propName) {
-      scene.propName.split(',').forEach((name, i) => {
-        if(name.trim()) scene.props.push({ id: 'p' + Date.now() + i, name: name.trim(), status: scene.propStatus || '未着手', desc: scene.propDesc || '', price: scene.propPrice || '' });
-      });
-    }
+    if (scene.propName) { scene.propName.split(',').forEach((n, i) => { if(n.trim()) scene.props.push({ id: 'p'+Date.now()+i, name: n.trim(), status: scene.propStatus||'未着手', desc: scene.propDesc||'', price: scene.propPrice||'' }); }); }
   }
   return scene;
 }
 
+// 🌟 ブラウザの戻る・進むボタンが使えるようにする「ルーティング」の魔法です！
+window.addEventListener('hashchange', (e) => {
+  if (e.oldURL) {
+    const oldHash = e.oldURL.split('#')[1];
+    if (oldHash && !oldHash.startsWith('scene/')) {
+      lastViewHash = oldHash;
+    }
+  }
+  handleHash();
+});
+
+function handleHash(isDataUpdate = false) {
+  const hash = window.location.hash.replace('#', '');
+  if (!hash || hash === 'home') {
+    executeGoHome(isDataUpdate);
+  } else if (hash.startsWith('movie/')) {
+    executeGoMovie(parseInt(hash.split('/')[1]), isDataUpdate);
+  } else if (hash.startsWith('scene/')) {
+    const parts = hash.split('/');
+    executeGoScene(parseInt(parts[2]), parseInt(parts[1]), isDataUpdate);
+  } else if (hash.startsWith('search/')) {
+    executeGoSearch(parseInt(hash.split('/')[1]), isDataUpdate);
+  } else if (hash.startsWith('details/')) {
+    executeGoMovieDetails(parseInt(hash.split('/')[1]), isDataUpdate);
+  } else if (hash.startsWith('daily/')) {
+    executeGoDaily(hash.split('/')[1], isDataUpdate);
+  }
+}
+
+let isInitialLoad = true;
 onSnapshot(moviesRef, (snapshot) => {
   movies = [];
   snapshot.forEach((doc) => {
@@ -61,34 +78,150 @@ onSnapshot(moviesRef, (snapshot) => {
     movies.push(data);
   });
   
-  if (currentMovieId) {
-    if (!movies.find(m => m.id === currentMovieId)) {
-      goHome();
-    } else {
-      populateSearchFilters();
-      if(!document.getElementById('view-search').classList.contains('hidden')) {
-        renderSearchResults();
-      } else if(!document.getElementById('view-movie-details').classList.contains('hidden')) {
-        // 保留
-      } else {
-        renderMovie();
-      }
-      if(currentSceneId) {
-        if(document.getElementById('detail-pane-edit').classList.contains('hidden')) {
-          renderSceneViewDetail(); 
-        } else {
-          renderSceneEditDetail(); 
-        }
-      }
-    }
-  } else if (!document.getElementById('view-daily').classList.contains('hidden')) {
-    // 保留
+  if (isInitialLoad) {
+    isInitialLoad = false;
+    handleHash();
   } else {
-    renderHome();
+    handleHash(true); // 他の人の更新を画面に反映させます（入力途中の文字は守ります）
   }
 });
 
-function toggleEditorMode() {
+// 🌟 ナビゲーション関数を、すべて「URLのハッシュを書き換えるだけ」に変更しました
+window.goHome = () => { window.location.hash = 'home'; };
+window.goMovie = (id) => { window.location.hash = 'movie/' + id; };
+window.goSearch = () => { window.location.hash = 'search/' + currentMovieId; };
+window.goMovieDetails = (id) => { window.location.hash = 'details/' + id; };
+window.goScene = (sId, forceMovieId) => { window.location.hash = `scene/${forceMovieId || currentMovieId}/${sId}`; };
+window.backFromSearch = () => { window.location.hash = `movie/${currentMovieId}`; };
+window.closeSceneDetail = () => { window.location.hash = lastViewHash || `movie/${currentMovieId}`; };
+window.showDailyScenes = (dateStr) => { window.location.hash = `daily/${dateStr}`; };
+
+// ここから下が、実際に画面を切り替える内部の処理です……！
+function executeGoHome(isDataUpdate) {
+  currentMovieId = null;
+  renderHome(); 
+  document.getElementById('header-movie-title-nav').classList.add('hidden');
+  document.getElementById('header-main-title').textContent = '製作映画一覧';
+  showViewUI('view-home'); 
+}
+
+function executeGoMovie(mId, isDataUpdate) {
+  currentMovieId = mId; 
+  selectedSceneIds.clear();
+  document.getElementById('bulk-delete-btn').classList.add('hidden');
+  
+  const movie = movies.find(m => m.id === currentMovieId);
+  if(!movie) return;
+  document.getElementById('header-movie-title-nav').classList.remove('hidden');
+  document.getElementById('header-title-sub').textContent = movie.title;
+  document.getElementById('header-main-title').textContent = movie.title;
+  
+  if(!isDataUpdate) {
+    document.getElementById('new-scene-dates').innerHTML = '';
+    addDateInput('new-scene-dates');
+    setViewMode('list');
+  }
+  populateSearchFilters();
+  renderMovie();
+  
+  document.getElementById('detail-pane').classList.remove('show-detail');
+  document.getElementById('list-pane').classList.remove('hide-on-mobile');
+  currentSceneId = null;
+  
+  showViewUI('view-movie'); 
+}
+
+function executeGoScene(sId, mId, isDataUpdate) {
+  currentMovieId = mId;
+  currentSceneId = sId;
+  const movie = movies.find(m => m.id === currentMovieId);
+  if(!movie) return;
+  document.getElementById('header-movie-title-nav').classList.remove('hidden');
+  document.getElementById('header-title-sub').textContent = movie.title;
+
+  if(!isDataUpdate) {
+    document.getElementById('detail-pane-edit').classList.add('hidden');
+    document.getElementById('detail-pane-view').classList.remove('hidden');
+  }
+  
+  if(document.getElementById('detail-pane-edit').classList.contains('hidden')) {
+    renderSceneViewDetail(); 
+  } else if(!isDataUpdate) {
+    renderSceneEditDetail();
+  }
+
+  const detailPane = document.getElementById('detail-pane');
+  const listPane = document.getElementById('list-pane');
+  detailPane.classList.add('show-detail');
+  listPane.classList.add('hide-on-mobile'); 
+  
+  renderMovie();
+  showViewUI('view-movie'); 
+}
+
+function executeGoSearch(mId, isDataUpdate) {
+  currentMovieId = mId;
+  populateSearchFilters();
+  if(!isDataUpdate) clearSearch(false);
+  renderSearchResults();
+  showViewUI('view-search');
+}
+
+function executeGoMovieDetails(mId, isDataUpdate) {
+  currentMovieId = mId;
+  const movie = movies.find(m => m.id === currentMovieId);
+  if(!movie) return;
+  if(!isDataUpdate) {
+    document.getElementById('movie-detail-title').value = movie.title || '';
+    document.getElementById('movie-detail-icon').value = movie.icon || '';
+    document.getElementById('movie-detail-type').value = movie.type || '';
+    document.getElementById('movie-detail-director').value = movie.director || '';
+    document.getElementById('movie-detail-year').value = movie.year || '';
+  }
+  showViewUI('view-movie-details');
+}
+
+function executeGoDaily(dateStr, isDataUpdate) {
+  document.getElementById('header-movie-title-nav').classList.remove('hidden');
+  document.getElementById('header-title-sub').textContent = `${dateStr} の予定`;
+  document.getElementById('header-main-title').textContent = `${dateStr} の撮影予定`;
+  document.getElementById('daily-date-title').textContent = `${dateStr} の撮影予定`;
+  
+  const container = document.getElementById('daily-scene-list-container');
+  container.innerHTML = '';
+  
+  let activeScenes = [];
+  movies.forEach(m => {
+    if(getParticipation(m.id)) m.scenes.forEach(s => activeScenes.push({ movie: m, scene: s }));
+  });
+  
+  const dayScenes = activeScenes.filter(item => item.scene.dates && (item.scene.dates.includes(dateStr) || item.scene.dates.includes(dateStr.replace(/-0/g, '-')))); 
+  
+  dayScenes.sort((a, b) => a.scene.number.localeCompare(b.scene.number, undefined, {numeric: true, sensitivity: 'base'})).forEach(item => {
+    const card = createSceneCard(item.scene, item.movie.id);
+    const titleObj = document.createElement('div');
+    const icon = item.movie.icon || '🎬';
+    titleObj.innerHTML = `<strong style="color: #1976d2; font-size: 14px;">${icon} 映画: ${item.movie.title}</strong><hr style="border:0; border-top:1px dashed #ccc; margin: 4px 0;">`;
+    card.prepend(titleObj);
+    container.appendChild(card);
+  });
+  showViewUI('view-daily');
+}
+
+function showViewUI(viewId) {
+  ['view-home', 'view-movie', 'view-daily', 'view-search', 'view-movie-details'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.classList.add('hidden');
+  });
+  document.getElementById(viewId).classList.remove('hidden');
+  if(viewId === 'view-movie' || viewId === 'view-search') {
+    document.getElementById('header-search-btn').classList.remove('hidden');
+  } else {
+    document.getElementById('header-search-btn').classList.add('hidden');
+  }
+}
+
+window.toggleEditorMode = function() {
   if (isEditorMode) {
     isEditorMode = false;
     document.body.classList.remove('editor-mode');
@@ -110,22 +243,11 @@ function toggleEditorMode() {
   }
   renderHome();
   if (currentMovieId) renderMovie();
-}
+};
 
 async function saveMovie(movie) { await setDoc(doc(db, "movies", movie.id.toString()), movie); }
 
-function goMovieDetails(movieId) {
-  currentMovieId = movieId;
-  const movie = movies.find(m => m.id === currentMovieId);
-  document.getElementById('movie-detail-title').value = movie.title || '';
-  document.getElementById('movie-detail-icon').value = movie.icon || '';
-  document.getElementById('movie-detail-type').value = movie.type || '';
-  document.getElementById('movie-detail-director').value = movie.director || '';
-  document.getElementById('movie-detail-year').value = movie.year || '';
-  showView('view-movie-details');
-}
-
-function saveMovieDetails() {
+window.saveMovieDetails = function() {
   const movie = movies.find(m => m.id === currentMovieId);
   movie.title = document.getElementById('movie-detail-title').value.trim();
   movie.icon = document.getElementById('movie-detail-icon').value.trim();
@@ -134,26 +256,25 @@ function saveMovieDetails() {
   movie.year = document.getElementById('movie-detail-year').value.trim();
   if(!movie.title) { alert('タイトルは必須です。'); return; }
   saveMovie(movie);
-  goHome();
-}
+  window.goHome();
+};
 
-async function deleteMovieFromDetails() {
+window.deleteMovieFromDetails = async function() {
   const movie = movies.find(m => m.id === currentMovieId);
   if(confirm(`映画「${movie.title}」を本当に削除しますか？`)) {
     await deleteDoc(doc(db, "movies", currentMovieId.toString()));
-    goHome();
+    window.goHome();
   }
-}
+};
 
 function getParticipation(movieId) { return localStorage.getItem('part_' + movieId) === 'true'; }
 window.toggleParticipation = function(movieId) {
   const current = getParticipation(movieId);
   localStorage.setItem('part_' + movieId, current ? 'false' : 'true');
   renderHome(); 
-}
+};
 
-let isDarkMode = false;
-function toggleDarkMode() {
+window.toggleDarkMode = function() {
   isDarkMode = !isDarkMode;
   const body = document.body;
   if(isDarkMode) {
@@ -163,20 +284,18 @@ function toggleDarkMode() {
     body.classList.remove('dark-mode');
     document.getElementById('dark-mode-btn').textContent = '🌙';
   }
-}
+};
 
-// 🌟 ネイティブのカレンダー入力を追加する魔法です！
-function addDateInput(containerId, initDate = null) {
+window.addDateInput = function(containerId, initDate = null) {
   const container = document.getElementById(containerId);
   const div = document.createElement('div');
   div.style = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
-  
   div.innerHTML = `
     <input type="date" class="native-date-input" value="${initDate || ''}" onchange="checkSceneInput()">
     <button type="button" class="item-remove-btn" style="position:static; padding:4px 8px;" onclick="this.parentElement.remove(); checkSceneInput();" title="消す">✕</button>
   `;
   container.appendChild(div);
-}
+};
 
 function collectDatesFromContainer(containerId) {
   const dates = [];
@@ -186,10 +305,10 @@ function collectDatesFromContainer(containerId) {
   return dates;
 }
 
-function updateSelectColor(sel) {
+window.updateSelectColor = function(sel) {
   sel.classList.remove('status-未着手', 'status-準備中', 'status-準備完了', 'status-使用済み');
   sel.classList.add('status-' + sel.value);
-}
+};
 
 function parseExcelDate(serial) {
   if (typeof serial === 'number') {
@@ -200,129 +319,29 @@ function parseExcelDate(serial) {
   return serial || '';
 }
 
-function showView(viewId) {
-  ['view-home', 'view-movie', 'view-daily', 'view-search', 'view-movie-details'].forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.classList.add('hidden');
-  });
-  document.getElementById(viewId).classList.remove('hidden');
+window.scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
-  if(viewId === 'view-movie' || viewId === 'view-search') {
-    document.getElementById('header-search-btn').classList.remove('hidden');
-  } else {
-    document.getElementById('header-search-btn').classList.add('hidden');
-  }
-
-  const newSceneDetails = document.getElementById('new-scene-details');
-  if (newSceneDetails) newSceneDetails.removeAttribute('open');
-}
-
-function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
-
-function goHome() { 
-  currentMovieId = null;
-  lastViewBeforeDetail = null;
-  renderHome(); 
-  document.getElementById('header-movie-title-nav').classList.add('hidden');
-  document.getElementById('header-main-title').textContent = '製作映画一覧';
-  showView('view-home'); 
-}
-
-function goMovie(movieId) { 
-  currentMovieId = movieId; 
-  closeSceneDetail(true); 
-  selectedSceneIds.clear();
-  document.getElementById('bulk-delete-btn').classList.add('hidden');
-
-  const movie = movies.find(m => m.id === currentMovieId);
-  document.getElementById('header-movie-title-nav').classList.remove('hidden');
-  document.getElementById('header-title-sub').textContent = movie.title;
-  document.getElementById('header-main-title').textContent = movie.title;
-  
-  document.getElementById('new-scene-dates').innerHTML = '';
-  addDateInput('new-scene-dates');
-
-  populateSearchFilters();
-  setViewMode('list');
-  showView('view-movie'); 
-}
-
-function goSearch() {
-  populateSearchFilters();
-  clearSearch(false);
-  renderSearchResults();
-  showView('view-search');
-}
-
-function backFromSearch() {
-  showView('view-movie');
-  renderMovie();
-}
-
-function goScene(sceneId, forceMovieId = null) { 
-  const currentVisibleView = ['view-home', 'view-movie', 'view-daily', 'view-search', 'view-movie-details'].find(id => !document.getElementById(id).classList.contains('hidden'));
-  if (currentVisibleView && currentVisibleView !== 'view-movie') {
-    lastViewBeforeDetail = currentVisibleView;
-  }
-
-  if(forceMovieId) {
-    currentMovieId = forceMovieId;
-    document.getElementById('header-movie-title-nav').classList.remove('hidden');
-    const movie = movies.find(m => m.id === currentMovieId);
-    document.getElementById('header-title-sub').textContent = movie.title;
-  }
-  currentSceneId = sceneId; 
-  
-  document.getElementById('detail-pane-edit').classList.add('hidden');
-  document.getElementById('detail-pane-view').classList.remove('hidden');
-  renderSceneViewDetail(); 
-
-  const detailPane = document.getElementById('detail-pane');
-  const listPane = document.getElementById('list-pane');
-  detailPane.classList.add('show-detail');
-  listPane.classList.add('hide-on-mobile'); 
-  
-  showView('view-movie'); 
-  renderMovie();
-  
-  if(window.innerWidth < 800) window.scrollTo(0, 0); 
-}
-
-function openSceneEdit() {
+window.openSceneEdit = function() {
   document.getElementById('detail-pane-view').classList.add('hidden');
   document.getElementById('detail-pane-edit').classList.remove('hidden');
   renderSceneEditDetail();
-}
+};
 
-function cancelSceneEdit() {
+window.cancelSceneEdit = function() {
   document.getElementById('detail-pane-edit').classList.add('hidden');
   document.getElementById('detail-pane-view').classList.remove('hidden');
-}
+};
 
-function closeSceneDetail(forceReset = false) {
-  document.getElementById('detail-pane').classList.remove('show-detail');
-  document.getElementById('list-pane').classList.remove('hide-on-mobile');
-  currentSceneId = null;
-  
-  if (!forceReset && lastViewBeforeDetail) {
-    showView(lastViewBeforeDetail);
-    if (lastViewBeforeDetail === 'view-search') renderSearchResults();
-    lastViewBeforeDetail = null;
-  } else {
-    renderMovie(); 
-  }
-}
-
-function addMovie() {
+window.addMovie = function() {
   const titleInput = document.getElementById('new-movie-title');
   const title = titleInput.value.trim();
   if (!title) return;
   const newMovie = { id: Date.now(), title: title, scenes: [], type: '', director: '', year: '', icon: '🎬' };
   saveMovie(newMovie); 
   titleInput.value = '';
-}
+};
 
-function handleExcelUpload(event) {
+window.handleExcelUpload = function(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -364,7 +383,33 @@ function handleExcelUpload(event) {
     alert(movieTitle + ' のデータを読み込みました。');
   };
   reader.readAsArrayBuffer(file);
-}
+};
+
+// 🌟 Excelで出力する魔法です！
+window.exportToExcel = function() {
+  const movie = movies.find(m => m.id === currentMovieId);
+  if(!movie) return;
+  const aoa = [['シーン番号', '撮影日', 'シーン名', '場所', '衣装ステータス', '衣装名', '衣装詳細', '金額/メモ', '小道具ステータス', '物品名', '小道具詳細', '金額/メモ']];
+  
+  movie.scenes.forEach(s => {
+    const dateStr = s.dates ? s.dates.join(', ') : '';
+    const cStats = (s.costumes||[]).map(c=>c.status).join(', ');
+    const cNames = (s.costumes||[]).map(c=>c.name).join(', ');
+    const cDescs = (s.costumes||[]).map(c=>c.desc).join(', ');
+    const cPrices = (s.costumes||[]).map(c=>c.price).join(', ');
+    
+    const pStats = (s.props||[]).map(p=>p.status).join(', ');
+    const pNames = (s.props||[]).map(p=>p.name).join(', ');
+    const pDescs = (s.props||[]).map(p=>p.desc).join(', ');
+    const pPrices = (s.props||[]).map(p=>p.price).join(', ');
+
+    aoa.push([s.number, dateStr, s.sceneName, s.location, cStats, cNames, cDescs, cPrices, pStats, pNames, pDescs, pPrices]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Scenes");
+  XLSX.writeFile(wb, `${movie.title}_シーン一覧.xlsx`);
+};
 
 function getSceneOverallStatus(scene) {
   const items = [...(scene.costumes || []), ...(scene.props || [])];
@@ -426,7 +471,7 @@ function renderGlobalCalendar() {
     if(dayScenes.length > 0) {
       td.style.cursor = 'pointer';
       td.style.backgroundColor = 'rgba(25, 118, 210, 0.05)';
-      td.onclick = () => showDailyScenes(dateStr, dayScenes);
+      td.onclick = () => window.showDailyScenes(dateStr);
       
       const dotContainer = document.createElement('div');
       dotContainer.className = 'cal-dot-container';
@@ -435,14 +480,12 @@ function renderGlobalCalendar() {
         const overall = getSceneOverallStatus(item.scene);
         const icon = item.movie.icon || '🎬';
         
-        // 🌟 パソコン用：映画アイコン ＋ 文字 ＋ 色のついた「〇」
         const marker = document.createElement('span');
         marker.className = `cal-marker`; 
         marker.innerHTML = `${icon} S${item.scene.number} <span class="cal-status-dot cal-status-${overall}">〇</span>`;
-        marker.onclick = (e) => { e.stopPropagation(); goScene(item.scene.id, item.movie.id); };
+        marker.onclick = (e) => { e.stopPropagation(); window.goScene(item.scene.id, item.movie.id); };
         td.appendChild(marker);
 
-        // 🌟 スマホ用：色のついたドット
         const dot = document.createElement('span');
         dot.className = `cal-dot cal-dot-${overall}`;
         dotContainer.appendChild(dot);
@@ -456,37 +499,15 @@ function renderGlobalCalendar() {
   container.appendChild(table);
 }
 
-function showDailyScenes(dateStr, dayScenes) {
-  document.getElementById('header-movie-title-nav').classList.remove('hidden');
-  document.getElementById('header-title-sub').textContent = `${dateStr} の予定`;
-  document.getElementById('header-main-title').textContent = `${dateStr} の撮影予定`;
-  
-  document.getElementById('daily-date-title').textContent = `${dateStr} の撮影予定`;
-  const container = document.getElementById('daily-scene-list-container');
-  container.innerHTML = '';
-  
-  dayScenes.sort((a, b) => a.scene.number.localeCompare(b.scene.number, undefined, {numeric: true, sensitivity: 'base'})).forEach(item => {
-    const card = createSceneCard(item.scene, item.movie.id);
-    const titleObj = document.createElement('div');
-    const icon = item.movie.icon || '🎬';
-    titleObj.innerHTML = `<strong style="color: #1976d2; font-size: 14px;">${icon} 映画: ${item.movie.title}</strong><hr style="border:0; border-top:1px dashed #ccc; margin: 4px 0;">`;
-    card.prepend(titleObj);
-    container.appendChild(card);
-  });
-  
-  showView('view-daily');
-}
-
-function changeGlobalCalMonth(diff) {
+window.changeGlobalCalMonth = function(diff) {
   globalCalMonth += diff;
   if(globalCalMonth < 0) { globalCalMonth = 11; globalCalYear--; }
   if(globalCalMonth > 11) { globalCalMonth = 0; globalCalYear++; }
   renderHome();
-}
+};
 
 function renderHome() {
   renderGlobalCalendar(); 
-
   const list = document.getElementById('movie-list');
   list.innerHTML = '';
   if(movies.length === 0) {
@@ -504,11 +525,11 @@ function renderHome() {
     if(movie.director) detailText += ` ｜ 監督: ${movie.director}`;
     if(movie.year) detailText += ` ｜ ${movie.year}年`;
 
-    let editBtnHtml = isEditorMode ? `<button class="edit-title-btn" onclick="event.stopPropagation(); goMovieDetails(${movie.id})">編集</button>` : '';
+    let editBtnHtml = isEditorMode ? `<button class="edit-title-btn" onclick="event.stopPropagation(); window.goMovieDetails(${movie.id})">編集</button>` : '';
     const icon = movie.icon || '🎬';
 
     div.innerHTML = `
-      <div class="movie-info" onclick="goMovie(${movie.id})">
+      <div class="movie-info" onclick="window.goMovie(${movie.id})">
         <strong>${icon} ${movie.type ? `[${movie.type}] ` : ''}${movie.title}</strong>
         <div class="scene-info" style="margin-left: 12px; margin-top: 0;">${detailText}</div>
       </div>
@@ -516,7 +537,7 @@ function renderHome() {
         <label class="switch-container" onclick="event.stopPropagation();">
           <span class="switch-label">${toggleText}</span>
           <div class="switch">
-            <input type="checkbox" ${isPart ? 'checked' : ''} onchange="toggleParticipation(${movie.id})">
+            <input type="checkbox" ${isPart ? 'checked' : ''} onchange="window.toggleParticipation(${movie.id})">
             <span class="slider"></span>
           </div>
         </label>
@@ -527,11 +548,11 @@ function renderHome() {
   });
 }
 
-function checkSceneInput() {
+window.checkSceneInput = function() {
   const num = document.getElementById('new-scene-number').value.trim();
   const btn = document.getElementById('add-scene-btn');
   btn.disabled = (num === '');
-}
+};
 
 function createItemInputHTML(type, item = null) {
   const id = item ? item.id : Date.now() + Math.random().toString(36).substring(2,7);
@@ -544,7 +565,6 @@ function createItemInputHTML(type, item = null) {
   div.className = 'item-input-block';
   div.dataset.id = id;
   
-  // 🌟 枠の中のラベルとプレースホルダーも指定通りに分けました！
   div.innerHTML = `
     <button type="button" class="item-remove-btn" onclick="this.closest('.item-input-block').remove()" title="この枠を消す">✕</button>
     <select class="item-status status-color status-${status}" onchange="updateSelectColor(this)">
@@ -567,14 +587,9 @@ function createItemInputHTML(type, item = null) {
   return div;
 }
 
-function addCostumeInput(containerId, item = null) {
-  document.getElementById(containerId).appendChild(createItemInputHTML('costume', item));
-}
-function addPropInput(containerId, item = null) {
-  document.getElementById(containerId).appendChild(createItemInputHTML('prop', item));
-}
+window.addCostumeInput = function(containerId, item = null) { document.getElementById(containerId).appendChild(createItemInputHTML('costume', item)); };
+window.addPropInput = function(containerId, item = null) { document.getElementById(containerId).appendChild(createItemInputHTML('prop', item)); };
 
-// 🌟 今開いている映画の中だけで候補を探してチップにする魔法です！
 window.showSuggestions = function(inputElem, type) {
   const name = inputElem.value.trim();
   const block = inputElem.closest('.item-input-block');
@@ -634,7 +649,6 @@ function collectItemsFromDOM(containerId) {
   return items;
 }
 
-// 🌟 名前が完全に同じなら、ステータスを映画全体で統一（同期）する魔法です！
 function syncItemStatuses(movie, updatedItems, typeKey) {
   updatedItems.forEach(updatedItem => {
     movie.scenes.forEach(scene => {
@@ -648,7 +662,7 @@ function syncItemStatuses(movie, updatedItems, typeKey) {
   });
 }
 
-function addScene() {
+window.addScene = function() {
   const num = document.getElementById('new-scene-number').value.trim();
   const name = document.getElementById('new-scene-name').value.trim();
   const loc = document.getElementById('new-scene-location').value.trim();
@@ -663,7 +677,6 @@ function addScene() {
     costumes: newCostumes, props: newProps
   });
 
-  // 🌟 ステータスを同期します
   syncItemStatuses(movie, newCostumes, 'costumes');
   syncItemStatuses(movie, newProps, 'props');
 
@@ -680,9 +693,9 @@ function addScene() {
   document.getElementById('new-scene-details').removeAttribute('open');
   
   checkSceneInput();
-}
+};
 
-function toggleSceneSelection(sceneId, checkbox, event) {
+window.toggleSceneSelection = function(sceneId, checkbox, event) {
   event.stopPropagation();
   if(checkbox.checked) selectedSceneIds.add(sceneId);
   else selectedSceneIds.delete(sceneId);
@@ -694,9 +707,9 @@ function toggleSceneSelection(sceneId, checkbox, event) {
   const card = checkbox.closest('.card');
   if(checkbox.checked) card.classList.add('selected-card');
   else card.classList.remove('selected-card');
-}
+};
 
-function deleteSelectedScenes() {
+window.deleteSelectedScenes = function() {
   if(confirm(`${selectedSceneIds.size}件のシーンを削除しますか？`)) {
     const movie = movies.find(m => m.id === currentMovieId);
     movie.scenes = movie.scenes.filter(s => !selectedSceneIds.has(s.id));
@@ -704,24 +717,24 @@ function deleteSelectedScenes() {
     document.getElementById('bulk-delete-btn').classList.add('hidden');
     saveMovie(movie);
   }
-}
+};
 
-function deleteScene() {
+window.deleteScene = function() {
   if(!currentSceneId) return;
   if(confirm("本当にこのシーンを削除してもよろしいですか？")) {
     const movie = movies.find(m => m.id === currentMovieId);
     movie.scenes = movie.scenes.filter(s => s.id !== currentSceneId);
     saveMovie(movie); 
-    closeSceneDetail(); 
+    window.closeSceneDetail(); 
   }
-}
+};
 
-function clearSearch(doRender = true) {
+window.clearSearch = function(doRender = true) {
   ['number', 'location', 'date', 'costume', 'prop'].forEach(id => {
     document.getElementById('search-' + id).value = '';
   });
   if(doRender) renderSearchResults();
-}
+};
 
 function getUniqueProperties(movie, propName) {
   const items = new Set();
@@ -733,7 +746,6 @@ function getUniqueProperties(movie, propName) {
     }
   });
   let arr = Array.from(items).filter(x => x);
-  // 🌟 数字順（1, 2, 13, 15...）で綺麗に並べます
   if (propName === 'number') {
     arr.sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
   } else {
@@ -741,6 +753,7 @@ function getUniqueProperties(movie, propName) {
   }
   return arr;
 }
+
 function getUniqueItemNames(movie, typeKey) {
   const names = new Set();
   movie.scenes.forEach(s => {
@@ -777,7 +790,7 @@ function populateSearchFilters() {
   });
 }
 
-function setViewMode(mode) {
+window.setViewMode = function(mode) {
   currentViewMode = mode;
   ['list', 'cos', 'prop'].forEach(id => {
     document.getElementById('btn-view-' + id).classList.remove('active');
@@ -802,9 +815,9 @@ function setViewMode(mode) {
   }
   
   renderMovie();
-}
+};
 
-function updateSort(val) { currentSort = val; renderMovie(); }
+window.updateSort = function(val) { currentSort = val; renderMovie(); };
 
 function createSceneCard(scene, forceMovieId = null) {
   const div = document.createElement('div');
@@ -818,7 +831,7 @@ function createSceneCard(scene, forceMovieId = null) {
   let html = `<div class="scene-card-header">`;
   
   if(!forceMovieId && isEditorMode) {
-    html += `<input type="checkbox" class="scene-checkbox" ${selectedSceneIds.has(scene.id)?'checked':''} onclick="toggleSceneSelection(${scene.id}, this, event)">`;
+    html += `<input type="checkbox" class="scene-checkbox" ${selectedSceneIds.has(scene.id)?'checked':''} onclick="window.toggleSceneSelection(${scene.id}, this, event)">`;
   }
   
   html += `<div class="scene-content">`;
@@ -843,7 +856,7 @@ function createSceneCard(scene, forceMovieId = null) {
   html += `</div></div></div>`;
   
   div.innerHTML = html;
-  div.onclick = () => goScene(scene.id, forceMovieId);
+  div.onclick = () => window.goScene(scene.id, forceMovieId);
   return div;
 }
 
@@ -919,7 +932,7 @@ function renderInventory(movie, listContainer, typeKey) {
   });
 }
 
-function renderSearchResults() {
+window.renderSearchResults = function() {
   const movie = movies.find(m => m.id === currentMovieId);
   const list = document.getElementById('search-result-list');
   list.innerHTML = '';
@@ -947,7 +960,7 @@ function renderSearchResults() {
 
   displayScenes.forEach(scene => list.appendChild(createSceneCard(scene)));
   if(displayScenes.length === 0) list.innerHTML = '<p class="scene-info">条件に合うシーンが見つかりませんでした。</p>';
-}
+};
 
 function renderMovie() {
   const movie = movies.find(m => m.id === currentMovieId);
@@ -1054,7 +1067,7 @@ function renderSceneEditDetail() {
   (scene.props || []).forEach(p => addPropInput('edit-prop-list', p));
 }
 
-function saveEditedScene() {
+window.saveEditedScene = function() {
   if(!currentSceneId) return;
   const movie = movies.find(m => m.id === currentMovieId);
   const scene = movie.scenes.find(s => s.id === currentSceneId);
@@ -1070,46 +1083,12 @@ function saveEditedScene() {
   scene.costumes = newCostumes;
   scene.props = newProps;
 
-  // 🌟 ステータスを同期します
   syncItemStatuses(movie, newCostumes, 'costumes');
   syncItemStatuses(movie, newProps, 'props');
 
   saveMovie(movie); 
   populateSearchFilters();
   
-  cancelSceneEdit();
+  window.cancelSceneEdit();
   alert('シーンの変更を保存しました。');
-}
-
-window.toggleEditorMode = toggleEditorMode;
-window.toggleDarkMode = toggleDarkMode;
-window.addDateInput = addDateInput;
-window.checkSceneInput = checkSceneInput;
-window.updateSelectColor = updateSelectColor;
-window.scrollToTop = scrollToTop;
-window.goHome = goHome;
-window.goMovie = goMovie;
-window.goMovieDetails = goMovieDetails;
-window.saveMovieDetails = saveMovieDetails;
-window.deleteMovieFromDetails = deleteMovieFromDetails;
-window.goSearch = goSearch;
-window.backFromSearch = backFromSearch;
-window.goScene = goScene;
-window.openSceneEdit = openSceneEdit;
-window.cancelSceneEdit = cancelSceneEdit;
-window.closeSceneDetail = closeSceneDetail;
-window.addMovie = addMovie;
-window.handleExcelUpload = handleExcelUpload;
-window.changeGlobalCalMonth = changeGlobalCalMonth;
-window.showDailyScenes = showDailyScenes;
-window.addScene = addScene;
-window.deleteScene = deleteScene;
-window.toggleSceneSelection = toggleSceneSelection;
-window.deleteSelectedScenes = deleteSelectedScenes;
-window.setViewMode = setViewMode;
-window.updateSort = updateSort;
-window.addCostumeInput = addCostumeInput;
-window.addPropInput = addPropInput;
-window.saveEditedScene = saveEditedScene;
-window.clearSearch = clearSearch;
-window.renderSearchResults = renderSearchResults;
+};

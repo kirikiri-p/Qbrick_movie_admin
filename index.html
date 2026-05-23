@@ -38,7 +38,6 @@
       
       <h4 style="margin-top: 24px; color: var(--accent-color);">Excelから読み込む</h4>
       <input type="file" id="excel-upload" accept=".xlsx, .xls" onchange="handleExcelUpload(event)">
-      <!-- 🌟 テンプレートのダウンロードリンクです -->
       <a href="Qbrick_管理テンプレート.xlsx" download class="template-download-link">📥 テンプレートをダウンロード</a>
     </div>
 
@@ -60,7 +59,6 @@
       <label class="input-label">映画タイトル</label>
       <input type="text" id="movie-detail-title">
       
-      <!-- 🌟 アイコンの登録欄を追加しました -->
       <label class="input-label">アイコン (絵文字)</label>
       <input type="text" id="movie-detail-icon" placeholder="例: 🎬" maxlength="2">
 
@@ -115,7 +113,6 @@
 
         <div class="card card-no-click editor-only">
           <h3>新しいシーンを追加</h3>
-          <!-- 🌟 上のラベルと中のプレースホルダーを分けました -->
           <label class="input-label">シーン番号（必須）</label>
           <input type="number" id="new-scene-number" placeholder="例: 13" oninput="checkSceneInput()">
           
@@ -127,7 +124,6 @@
               <label class="input-label">場所</label>
               <input type="text" id="new-scene-location" placeholder="例: 熊本大学北キャンパスくすのきホール" oninput="checkSceneInput()">
               
-              <!-- 🌟 撮影日をネイティブのDate入力に変えました！ -->
               <label class="input-label">撮影日</label>
               <div id="new-scene-dates"></div>
               <button type="button" class="secondary" style="margin-top: 4px;" onclick="addDateInput('new-scene-dates')">撮影日を追加</button>
@@ -150,7 +146,11 @@
           <button id="btn-view-prop" onclick="setViewMode('prop')">小道具一覧</button>
         </div>
 
-        <button id="bulk-delete-btn" class="danger hidden editor-only" onclick="deleteSelectedScenes()" style="margin-bottom: 16px; margin-top: 0;">選択したシーンをすべて削除</button>
+        <!-- 🌟 出力ボタンを並べました -->
+        <div style="display: flex; justify-content: flex-start; gap: 8px; margin-bottom: 16px;">
+          <button id="bulk-delete-btn" class="danger hidden editor-only" onclick="deleteSelectedScenes()" style="margin-top: 0; width: auto;">選択したシーンをすべて削除</button>
+          <button class="secondary editor-only" onclick="exportToExcel()" style="margin-top: 0; width: auto;">[↓] Excelで出力</button>
+        </div>
 
         <div id="scene-list"></div>
         <button class="secondary" onclick="goHome()">&lt; 映画一覧に戻る</button>
