@@ -21,12 +21,20 @@ let currentSceneId = null;
 let currentViewMode = 'list'; 
 let currentSort = 'num-asc'; 
 let selectedSceneIds = new Set(); 
-let lastViewBeforeDetail = null; // 🌟 どこから詳細を開いたかを覚えておく魔法です
+let lastViewBeforeDetail = null; 
 
+let isEditorMode = false;
 let globalCalYear = new Date().getFullYear();
 let globalCalMonth = new Date().getMonth();
 
+// 🌟 日付を複数持てるように（配列に）お引っ越しする魔法です
 function migrateSceneData(scene) {
+  if (scene.date && !scene.dates) {
+    scene.dates = [scene.date];
+  } else if (!scene.dates) {
+    scene.dates = [];
+  }
+
   if (!scene.costumes) {
     scene.costumes = [];
     if (scene.costumeName) {
@@ -58,12 +66,11 @@ onSnapshot(moviesRef, (snapshot) => {
     if (!movies.find(m => m.id === currentMovieId)) {
       goHome();
     } else {
-      updateDataLists();
       populateSearchFilters();
       if(!document.getElementById('view-search').classList.contains('hidden')) {
         renderSearchResults();
       } else if(!document.getElementById('view-movie-details').classList.contains('hidden')) {
-        // 映画詳細画面の場合は再描画保留
+        // 保留
       } else {
         renderMovie();
       }
@@ -76,15 +83,37 @@ onSnapshot(moviesRef, (snapshot) => {
       }
     }
   } else if (!document.getElementById('view-daily').classList.contains('hidden')) {
-    // 予定画面の場合は再描画保留
+    // 保留
   } else {
     renderHome();
   }
 });
 
-async function saveMovie(movie) {
-  await setDoc(doc(db, "movies", movie.id.toString()), movie);
+function toggleEditorMode() {
+  if (isEditorMode) {
+    isEditorMode = false;
+    document.body.classList.remove('editor-mode');
+    document.getElementById('editor-toggle-btn').textContent = '[鍵] 編集者モードになる';
+    selectedSceneIds.clear();
+    const bulkBtn = document.getElementById('bulk-delete-btn');
+    if(bulkBtn) bulkBtn.classList.add('hidden');
+    alert('閲覧モードに戻りました。');
+  } else {
+    const pass = prompt('編集者用パスワードを入力してください');
+    if (pass === 'きゅーぶりっく') {
+      isEditorMode = true;
+      document.body.classList.add('editor-mode');
+      document.getElementById('editor-toggle-btn').textContent = '[鍵] 閲覧モードに戻る';
+      alert('編集者モードに切り替わりました。');
+    } else if (pass !== null) {
+      alert('パスワードが違います……。');
+    }
+  }
+  renderHome();
+  if (currentMovieId) renderMovie();
 }
+
+async function saveMovie(movie) { await setDoc(doc(db, "movies", movie.id.toString()), movie); }
 
 function goMovieDetails(movieId) {
   currentMovieId = movieId;
@@ -102,7 +131,6 @@ function saveMovieDetails() {
   movie.type = document.getElementById('movie-detail-type').value;
   movie.director = document.getElementById('movie-detail-director').value.trim();
   movie.year = document.getElementById('movie-detail-year').value.trim();
-  
   if(!movie.title) { alert('タイトルは必須です。'); return; }
   saveMovie(movie);
   goHome();
@@ -110,15 +138,13 @@ function saveMovieDetails() {
 
 async function deleteMovieFromDetails() {
   const movie = movies.find(m => m.id === currentMovieId);
-  if(confirm(`映画「${movie.title}」を本当に削除しますか？\n登録されたシーンもすべて消えてしまいます。`)) {
+  if(confirm(`映画「${movie.title}」を本当に削除しますか？`)) {
     await deleteDoc(doc(db, "movies", currentMovieId.toString()));
     goHome();
   }
 }
 
 function getParticipation(movieId) { return localStorage.getItem('part_' + movieId) === 'true'; }
-
-// 🌟 参加ボタンが確実に押せるように直しました
 function toggleParticipation(movieId) {
   const current = getParticipation(movieId);
   localStorage.setItem('part_' + movieId, current ? 'false' : 'true');
@@ -138,25 +164,43 @@ function toggleDarkMode() {
   }
 }
 
-function initDateDials() {
-  const today = new Date();
-  const curY = today.getFullYear();
-  const prefixes = ['ns', 'ed']; 
-  prefixes.forEach(p => {
-    const ySel = document.getElementById(p+'-year');
-    const mSel = document.getElementById(p+'-month');
-    ySel.innerHTML = '<option value="">--</option>';
-    mSel.innerHTML = '<option value="">--</option>';
-    for(let i = curY - 3; i <= curY + 3; i++) ySel.add(new Option(i, i));
-    for(let i = 1; i <= 12; i++) mSel.add(new Option(i, ('0'+i).slice(-2)));
-  });
-  setDialDate('ns', `${curY}-${('0'+(today.getMonth()+1)).slice(-2)}-${('0'+today.getDate()).slice(-2)}`);
+// 🌟 日付の枠を自由に増やせるようにする魔法です！
+function addDateInput(containerId, initDate = null) {
+  const container = document.getElementById(containerId);
+  const div = document.createElement('div');
+  div.className = 'date-dial-container';
+  
+  div.innerHTML = `
+    <select class="date-year" onchange="updateDaysInContainer(this.parentElement); checkSceneInput();"></select><span>年</span>
+    <select class="date-month" onchange="updateDaysInContainer(this.parentElement); checkSceneInput();"></select><span>月</span>
+    <select class="date-day" onchange="checkSceneInput();"></select><span>日</span>
+    <button type="button" class="item-remove-btn" style="position:static; padding:4px;" onclick="this.parentElement.remove(); checkSceneInput();" title="消す">[x]</button>
+  `;
+  container.appendChild(div);
+  
+  const ySel = div.querySelector('.date-year');
+  const mSel = div.querySelector('.date-month');
+  
+  ySel.innerHTML = '<option value="">--</option>';
+  mSel.innerHTML = '<option value="">--</option>';
+  
+  const curY = new Date().getFullYear();
+  for(let i = curY - 3; i <= curY + 3; i++) ySel.add(new Option(i, i));
+  for(let i = 1; i <= 12; i++) mSel.add(new Option(i, ('0'+i).slice(-2)));
+  
+  if (initDate) {
+    const parts = initDate.split(/[-/]/);
+    ySel.value = parts[0] || '';
+    mSel.value = ('0'+parts[1]).slice(-2) || '';
+    updateDaysInContainer(div);
+    div.querySelector('.date-day').value = ('0'+parts[2]).slice(-2) || '';
+  }
 }
 
-function updateDays(prefix) {
-  const y = document.getElementById(prefix+'-year').value;
-  const m = document.getElementById(prefix+'-month').value;
-  const dSel = document.getElementById(prefix+'-day');
+function updateDaysInContainer(div) {
+  const y = div.querySelector('.date-year').value;
+  const m = div.querySelector('.date-month').value;
+  const dSel = div.querySelector('.date-day');
   const currentD = dSel.value;
   dSel.innerHTML = '<option value="">--</option>';
   if(!y || !m) return;
@@ -165,30 +209,16 @@ function updateDays(prefix) {
   if(currentD && currentD <= maxDay) dSel.value = currentD;
 }
 
-function getDialDate(prefix) {
-  const y = document.getElementById(prefix+'-year').value;
-  const m = document.getElementById(prefix+'-month').value;
-  const d = document.getElementById(prefix+'-day').value;
-  if(y && m && d) return `${y}-${m}-${d}`;
-  return '';
+function collectDatesFromContainer(containerId) {
+  const dates = [];
+  document.getElementById(containerId).querySelectorAll('.date-dial-container').forEach(div => {
+    const y = div.querySelector('.date-year').value;
+    const m = div.querySelector('.date-month').value;
+    const d = div.querySelector('.date-day').value;
+    if(y && m && d) dates.push(`${y}-${m}-${d}`);
+  });
+  return dates;
 }
-
-function setDialDate(prefix, dateStr) {
-  const ySel = document.getElementById(prefix+'-year');
-  const mSel = document.getElementById(prefix+'-month');
-  const dSel = document.getElementById(prefix+'-day');
-  if(!dateStr || dateStr.length < 8) {
-    ySel.value = ''; mSel.value = ''; dSel.value = '';
-  } else {
-    const parts = dateStr.split(/[-/]/);
-    ySel.value = parts[0] || '';
-    mSel.value = ('0'+parts[1]).slice(-2) || '';
-    updateDays(prefix);
-    dSel.value = ('0'+parts[2]).slice(-2) || '';
-  }
-}
-
-window.onload = () => { initDateDials(); };
 
 function updateSelectColor(sel) {
   sel.classList.remove('status-未着手', 'status-準備中', 'status-準備完了', 'status-使用済み');
@@ -234,7 +264,7 @@ function goHome() {
 
 function goMovie(movieId) { 
   currentMovieId = movieId; 
-  closeSceneDetail(true); // 強制的に閉じる
+  closeSceneDetail(true); 
   selectedSceneIds.clear();
   document.getElementById('bulk-delete-btn').classList.add('hidden');
 
@@ -243,7 +273,10 @@ function goMovie(movieId) {
   document.getElementById('header-title-sub').textContent = movie.title;
   document.getElementById('header-main-title').textContent = movie.title;
   
-  updateDataLists();
+  // 🌟 シーン追加画面の撮影日をリセットして1つだけ出しておきます
+  document.getElementById('new-scene-dates').innerHTML = '';
+  addDateInput('new-scene-dates');
+
   populateSearchFilters();
   setViewMode('list');
   showView('view-movie'); 
@@ -262,7 +295,6 @@ function backFromSearch() {
 }
 
 function goScene(sceneId, forceMovieId = null) { 
-  // 🌟 現在どの画面から飛んできたかを記憶します
   const currentVisibleView = ['view-home', 'view-movie', 'view-daily', 'view-search', 'view-movie-details'].find(id => !document.getElementById(id).classList.contains('hidden'));
   if (currentVisibleView && currentVisibleView !== 'view-movie') {
     lastViewBeforeDetail = currentVisibleView;
@@ -285,7 +317,7 @@ function goScene(sceneId, forceMovieId = null) {
   detailPane.classList.add('show-detail');
   listPane.classList.add('hide-on-mobile'); 
   
-  showView('view-movie'); // 詳細ペインを開くためにベースは view-movie にします
+  showView('view-movie'); 
   renderMovie();
   
   if(window.innerWidth < 800) window.scrollTo(0, 0); 
@@ -302,7 +334,6 @@ function cancelSceneEdit() {
   document.getElementById('detail-pane-view').classList.remove('hidden');
 }
 
-// 🌟 閉じた時に、元の画面に戻れるようにしました！
 function closeSceneDetail(forceReset = false) {
   document.getElementById('detail-pane').classList.remove('show-detail');
   document.getElementById('list-pane').classList.remove('hide-on-mobile');
@@ -353,9 +384,10 @@ function handleExcelUpload(event) {
       if (existing) {
         if(costumes.length > 0) existing.costumes.push(...costumes);
         if(props.length > 0) existing.props.push(...props);
+        if(date && !existing.dates.includes(date)) existing.dates.push(date);
       } else {
         newScenes.push({
-          id: Date.now() + index, number: number, date: date, sceneName: sceneName, location: location, costumes: costumes, props: props
+          id: Date.now() + index, number: number, dates: date ? [date] : [], sceneName: sceneName, location: location, costumes: costumes, props: props
         });
       }
     });
@@ -424,21 +456,33 @@ function renderGlobalCalendar() {
     td.innerHTML = `<span class="cal-day-num">${day}</span>`;
     
     const dateStr = `${globalCalYear}-${('0'+(globalCalMonth+1)).slice(-2)}-${('0'+day).slice(-2)}`;
-    const dayScenes = activeScenes.filter(item => item.scene.date === dateStr || item.scene.date === dateStr.replace(/-0/g, '-')); 
+    // 🌟 複数日付の配列を使って判定します
+    const dayScenes = activeScenes.filter(item => item.scene.dates.includes(dateStr) || item.scene.dates.includes(dateStr.replace(/-0/g, '-'))); 
     
     if(dayScenes.length > 0) {
       td.style.cursor = 'pointer';
       td.style.backgroundColor = 'rgba(25, 118, 210, 0.05)';
       td.onclick = () => showDailyScenes(dateStr, dayScenes);
       
+      const dotContainer = document.createElement('div');
+      dotContainer.className = 'cal-dot-container';
+
       dayScenes.forEach(item => {
         const overall = getSceneOverallStatus(item.scene);
+        
+        // パソコン用のマーカー
         const marker = document.createElement('span');
         marker.className = `cal-marker cal-marker-${overall}`; 
         marker.innerHTML = `[${item.movie.title}] S${item.scene.number}`;
         marker.onclick = (e) => { e.stopPropagation(); goScene(item.scene.id, item.movie.id); };
         td.appendChild(marker);
+
+        // スマホ用のドット
+        const dot = document.createElement('span');
+        dot.className = `cal-dot cal-dot-${overall}`;
+        dotContainer.appendChild(dot);
       });
+      td.appendChild(dotContainer);
     }
     tr.appendChild(td);
   }
@@ -456,7 +500,7 @@ function showDailyScenes(dateStr, dayScenes) {
   const container = document.getElementById('daily-scene-list-container');
   container.innerHTML = '';
   
-  dayScenes.sort((a, b) => Number(a.scene.number) - Number(b.scene.number)).forEach(item => {
+  dayScenes.sort((a, b) => a.scene.number.localeCompare(b.scene.number, undefined, {numeric: true, sensitivity: 'base'})).forEach(item => {
     const card = createSceneCard(item.scene, item.movie.id);
     const titleObj = document.createElement('div');
     titleObj.innerHTML = `<strong style="color: #1976d2; font-size: 14px;">映画: ${item.movie.title}</strong><hr style="border:0; border-top:1px dashed #ccc; margin: 4px 0;">`;
@@ -488,22 +532,29 @@ function renderHome() {
     div.className = 'card movie-list-item';
     
     const isPart = getParticipation(movie.id); 
-    const toggleClass = isPart ? 'active' : '';
-    const toggleText = isPart ? '参加中' : '不参加';
+    const toggleText = isPart ? '参加' : '非参加';
 
     let detailText = `${movie.scenes.length}件のシーン`;
     if(movie.director) detailText += ` ｜ 監督: ${movie.director}`;
     if(movie.year) detailText += ` ｜ ${movie.year}年`;
 
+    let editBtnHtml = isEditorMode ? `<button class="edit-title-btn" onclick="event.stopPropagation(); goMovieDetails(${movie.id})">[編集]</button>` : '';
+
+    // 🌟 参加ボタンをトグルスイッチに変えました！
     div.innerHTML = `
       <div class="movie-info" onclick="goMovie(${movie.id})">
         <strong>${movie.type ? `[${movie.type}] ` : ''}${movie.title}</strong>
         <div class="scene-info" style="margin-left: 12px; margin-top: 0;">${detailText}</div>
       </div>
       <div class="movie-actions">
-        <!-- 🌟 ボタンが確実に押せるように直しました！ -->
-        <button class="participation-toggle ${toggleClass}" onclick="event.stopPropagation(); toggleParticipation(${movie.id})">${toggleText}</button>
-        <button class="edit-title-btn" onclick="event.stopPropagation(); goMovieDetails(${movie.id})">[編集]</button>
+        <label class="switch-container" onclick="event.stopPropagation();">
+          <div class="switch">
+            <input type="checkbox" ${isPart ? 'checked' : ''} onchange="toggleParticipation(${movie.id})">
+            <span class="slider"></span>
+          </div>
+          <span class="switch-label">${toggleText}</span>
+        </label>
+        ${editBtnHtml}
       </div>
     `;
     list.appendChild(div);
@@ -522,12 +573,12 @@ function createItemInputHTML(type, item = null) {
   const name = item ? item.name : '';
   const desc = item ? item.desc : '';
   const price = item ? item.price : '';
-  const listId = type === 'costume' ? 'costume-datalist' : 'prop-datalist';
   
   const div = document.createElement('div');
   div.className = 'item-input-block';
   div.dataset.id = id;
   
+  // 🌟 入力したときに出てくる「候補コンテナ」を作りました
   div.innerHTML = `
     <button type="button" class="item-remove-btn" onclick="this.closest('.item-input-block').remove()" title="この枠を消す">[x]</button>
     <select class="item-status status-color status-${status}" onchange="updateSelectColor(this)">
@@ -536,7 +587,8 @@ function createItemInputHTML(type, item = null) {
       <option value="準備完了" ${status==='準備完了'?'selected':''}>準備完了</option>
       <option value="使用済み" ${status==='使用済み'?'selected':''}>使用済み</option>
     </select>
-    <input type="text" class="item-name" list="${listId}" placeholder="${type==='costume'?'衣装名':'物品名'}" value="${name}" oninput="autoFillItem(this, '${type}')">
+    <input type="text" class="item-name" placeholder="${type==='costume'?'例: スーツ':'例: ○○さんの私物'}" value="${name}" oninput="showSuggestions(this, '${type}')">
+    <div class="suggestion-container"></div>
     <textarea class="item-desc" placeholder="詳細">${desc}</textarea>
     <input type="text" class="item-price" placeholder="金額/メモ" value="${price}">
   `;
@@ -550,28 +602,50 @@ function addPropInput(containerId, item = null) {
   document.getElementById(containerId).appendChild(createItemInputHTML('prop', item));
 }
 
-function autoFillItem(inputElem, type) {
+// 🌟 自動入力の代わりに「チップ」で候補を出してあげる魔法です！
+window.showSuggestions = function(inputElem, type) {
   const name = inputElem.value.trim();
+  const block = inputElem.closest('.item-input-block');
+  const suggestionContainer = block.querySelector('.suggestion-container');
+  suggestionContainer.innerHTML = '';
+  
   if(!name) return;
   
-  let found = null;
+  const candidates = [];
+  const seen = new Set();
+  
   for(let m of movies) {
     for(let s of m.scenes) {
-       const items = (type === 'costume' ? s.costumes : s.props) || [];
-       found = items.find(i => i.name === name && (i.desc || i.price));
-       if(found) break;
+      const items = (type === 'costume' ? s.costumes : s.props) || [];
+      items.forEach(i => {
+        // 名前が少しでも似ていたら候補にします
+        if(i.name.includes(name) && (i.desc || i.price)) {
+          const key = i.name + '|' + i.desc + '|' + i.price;
+          if(!seen.has(key)) {
+            seen.add(key);
+            candidates.push(i);
+          }
+        }
+      });
     }
-    if(found) break;
   }
   
-  if(found) {
-    const block = inputElem.closest('.item-input-block');
-    const descInput = block.querySelector('.item-desc');
-    const priceInput = block.querySelector('.item-price');
-    if(descInput && !descInput.value) descInput.value = found.desc;
-    if(priceInput && !priceInput.value) priceInput.value = found.price;
-  }
-}
+  // 最大5個までチップを出します
+  candidates.slice(0, 5).forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'suggestion-chip';
+    chip.textContent = `${c.name} ${c.desc ? `(${c.desc.substring(0, 8)}...)` : ''}`;
+    chip.onclick = () => {
+      inputElem.value = c.name;
+      const descInput = block.querySelector('.item-desc');
+      const priceInput = block.querySelector('.item-price');
+      if(descInput) descInput.value = c.desc;
+      if(priceInput) priceInput.value = c.price;
+      suggestionContainer.innerHTML = ''; // 選んだらチップは消えます
+    };
+    suggestionContainer.appendChild(chip);
+  });
+};
 
 function collectItemsFromDOM(containerId) {
   const items = [];
@@ -594,11 +668,11 @@ function addScene() {
   const num = document.getElementById('new-scene-number').value.trim();
   const name = document.getElementById('new-scene-name').value.trim();
   const loc = document.getElementById('new-scene-location').value.trim();
-  const date = getDialDate('ns');
+  const dates = collectDatesFromContainer('new-scene-dates');
 
   const movie = movies.find(m => m.id === currentMovieId);
   movie.scenes.push({
-    id: Date.now(), number: num, sceneName: name, location: loc, date: date,
+    id: Date.now(), number: num, sceneName: name, location: loc, dates: dates,
     costumes: collectItemsFromDOM('new-costume-list'),
     props: collectItemsFromDOM('new-prop-list')
   });
@@ -608,6 +682,9 @@ function addScene() {
   document.getElementById('new-scene-number').value = '';
   document.getElementById('new-scene-name').value = '';
   document.getElementById('new-scene-location').value = '';
+  document.getElementById('new-scene-dates').innerHTML = '';
+  addDateInput('new-scene-dates'); // お掃除したらまた1つ枠を出しておきます
+  
   document.getElementById('new-costume-list').innerHTML = '';
   document.getElementById('new-prop-list').innerHTML = '';
   document.getElementById('new-scene-details').removeAttribute('open');
@@ -621,7 +698,7 @@ function toggleSceneSelection(sceneId, checkbox, event) {
   else selectedSceneIds.delete(sceneId);
   
   const btn = document.getElementById('bulk-delete-btn');
-  if(selectedSceneIds.size > 0) btn.classList.remove('hidden');
+  if(selectedSceneIds.size > 0 && isEditorMode) btn.classList.remove('hidden');
   else btn.classList.add('hidden');
   
   const card = checkbox.closest('.card');
@@ -659,10 +736,13 @@ function clearSearch(doRender = true) {
 function getUniqueProperties(movie, propName) {
   const items = new Set();
   movie.scenes.forEach(s => {
-    if(s[propName]) items.add(s[propName]);
+    if (propName === 'date' || propName === 'dates') {
+      (s.dates || []).forEach(d => items.add(d));
+    } else if(s[propName]) {
+      items.add(s[propName]);
+    }
   });
   let arr = Array.from(items).filter(x => x);
-  // 🌟 自然な順番で並ぶようにしました！（例：1, 2, 13, 15...）
   if (propName === 'number') {
     arr.sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
   } else {
@@ -697,7 +777,7 @@ function populateSearchFilters() {
 
   getUniqueProperties(movie, 'number').forEach(v => numSel.add(new Option(v, v)));
   getUniqueProperties(movie, 'location').forEach(v => locSel.add(new Option(v, v)));
-  getUniqueProperties(movie, 'date').forEach(v => dateSel.add(new Option(v, v)));
+  getUniqueProperties(movie, 'dates').forEach(v => dateSel.add(new Option(v, v)));
   getUniqueItemNames(movie, 'costumes').forEach(v => cosSel.add(new Option(v, v)));
   getUniqueItemNames(movie, 'props').forEach(v => propSel.add(new Option(v, v)));
 
@@ -706,18 +786,6 @@ function populateSearchFilters() {
   });
 }
 
-function updateDataLists() {
-  if(!currentMovieId) return;
-  const movie = movies.find(m => m.id === currentMovieId);
-  const cList = document.getElementById('costume-datalist');
-  const pList = document.getElementById('prop-datalist');
-  
-  cList.innerHTML = ''; pList.innerHTML = '';
-  getUniqueItemNames(movie, 'costumes').forEach(i => cList.appendChild(new Option(i)));
-  getUniqueItemNames(movie, 'props').forEach(i => pList.appendChild(new Option(i)));
-}
-
-// 🌟 エラーで止まらないように安全な書き方に直しました
 function setViewMode(mode) {
   currentViewMode = mode;
   ['list', 'cos', 'prop'].forEach(id => {
@@ -735,7 +803,7 @@ function setViewMode(mode) {
     currentSort = 'num-asc';
     sortSel.value = 'num-asc';
   } else {
-    sortSel.add(new Option('使用シーンが多い順', 'count-desc')); // デフォルトをこれにしました
+    sortSel.add(new Option('使用シーンが多い順', 'count-desc')); 
     sortSel.add(new Option('名前順', 'name-asc'));
     sortSel.add(new Option('最速使用日が早い順', 'date-asc'));
     currentSort = 'count-desc';
@@ -758,7 +826,7 @@ function createSceneCard(scene, forceMovieId = null) {
 
   let html = `<div class="scene-card-header">`;
   
-  if(!forceMovieId) {
+  if(!forceMovieId && isEditorMode) {
     html += `<input type="checkbox" class="scene-checkbox" ${selectedSceneIds.has(scene.id)?'checked':''} onclick="toggleSceneSelection(${scene.id}, this, event)">`;
   }
   
@@ -766,7 +834,13 @@ function createSceneCard(scene, forceMovieId = null) {
   html += `<strong>シーン ${scene.number}</strong>`;
   if(scene.sceneName) html += ` ｜ ${scene.sceneName}`;
   if(scene.location) html += ` ｜ ${scene.location}`;
-  html += `<div class="scene-info">撮影日: ${scene.date || '未定'}</div>`;
+  
+  // 複数日付の表示です
+  let dateText = '未定';
+  if (scene.dates && scene.dates.length > 0) {
+    dateText = scene.dates.join(', ');
+  }
+  html += `<div class="scene-info">撮影日: ${dateText}</div>`;
   
   html += `<div style="margin-top: 8px;">`;
   if(scene.costumes && scene.costumes.length > 0) {
@@ -786,11 +860,12 @@ function createSceneCard(scene, forceMovieId = null) {
 function getEarliestDate(movie, typeKey, itemName) {
   const scenes = movie.scenes.filter(s => {
     const items = (typeKey === 'costumes' ? s.costumes : s.props) || [];
-    return items.some(i => i.name === itemName) && s.date;
+    return items.some(i => i.name === itemName) && s.dates && s.dates.length > 0;
   });
   if(scenes.length === 0) return null;
-  const dates = scenes.map(s => s.date).sort();
-  return dates[0];
+  // すべての日付を集めてソートします
+  const allDates = scenes.flatMap(s => s.dates).sort();
+  return allDates[0];
 }
 
 function renderInventory(movie, listContainer, typeKey) {
@@ -873,10 +948,9 @@ function renderSearchResults() {
   const filterCos = document.getElementById('search-costume').value;
   const filterProp = document.getElementById('search-prop').value;
 
-  // 🌟 安全に確実に検索が引っかかるように直しました
   if(filterNum) displayScenes = displayScenes.filter(s => String(s.number) === String(filterNum));
   if(filterLoc) displayScenes = displayScenes.filter(s => s.location === filterLoc);
-  if(filterDate) displayScenes = displayScenes.filter(s => s.date === filterDate);
+  if(filterDate) displayScenes = displayScenes.filter(s => s.dates && s.dates.includes(filterDate));
   if(filterCos) displayScenes = displayScenes.filter(s => (s.costumes || []).some(c => c.name === filterCos));
   if(filterProp) displayScenes = displayScenes.filter(s => (s.props || []).some(p => p.name === filterProp));
 
@@ -907,10 +981,12 @@ function renderMovie() {
       if(currentSort === 'num-asc') return a.number.localeCompare(b.number, undefined, {numeric: true, sensitivity: 'base'});
       if(currentSort === 'num-desc') return b.number.localeCompare(a.number, undefined, {numeric: true, sensitivity: 'base'});
       if(currentSort === 'date-asc' || currentSort === 'date-desc') {
-        if(!a.date && !b.date) return 0;
-        if(!a.date) return 1;
-        if(!b.date) return -1;
-        return currentSort === 'date-asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
+        const dateA = (a.dates && a.dates.length > 0) ? [...a.dates].sort()[0] : null;
+        const dateB = (b.dates && b.dates.length > 0) ? [...b.dates].sort()[0] : null;
+        if(!dateA && !dateB) return 0;
+        if(!dateA) return 1;
+        if(!dateB) return -1;
+        return currentSort === 'date-asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
       }
       return 0;
     });
@@ -928,20 +1004,20 @@ function renderSceneViewDetail() {
   if(scene.sceneName) titleText += ` ｜ ${scene.sceneName}`;
   document.getElementById('view-scene-header').textContent = titleText;
   
-  let infoText = `場所: ${scene.location || '未定'} ｜ 撮影日: ${scene.date || '未定'}`;
+  let dateText = (scene.dates && scene.dates.length > 0) ? scene.dates.join(', ') : '未定';
+  let infoText = `場所: ${scene.location || '未定'} ｜ 撮影日: ${dateText}`;
   document.getElementById('view-scene-info').textContent = infoText;
 
   const cList = document.getElementById('view-scene-costumes');
   cList.innerHTML = '';
   if(scene.costumes && scene.costumes.length > 0) {
-    // 🌟 黒文字に変更しました！
     let html = `<strong style="color: var(--text-color);">[衣装]</strong><br>`;
     scene.costumes.forEach(c => {
-      html += `<div style="padding: 8px; border-left: 2px solid #ccc; margin-bottom: 4px; background: rgba(0,0,0,0.02);">
+      html += `<div style="padding: 8px; border-left: 2px solid var(--border-color); margin-bottom: 4px; background: rgba(0,0,0,0.02);">
         <span class="status-color status-${c.status}" style="padding:2px 4px; font-size:11px;">${c.status}</span> 
         <strong>${c.name}</strong>
         ${c.desc ? `<div class="scene-info" style="margin-top: 2px;">${c.desc}</div>` : ''}
-        ${c.price ? `<div class="scene-info" style="color:#888;">${c.price}</div>` : ''}
+        ${c.price ? `<div class="scene-info" style="color:var(--muted-text);">${c.price}</div>` : ''}
       </div>`;
     });
     cList.innerHTML = html;
@@ -950,14 +1026,13 @@ function renderSceneViewDetail() {
   const pList = document.getElementById('view-scene-props');
   pList.innerHTML = '';
   if(scene.props && scene.props.length > 0) {
-    // 🌟 黒文字に変更しました！
     let html = `<strong style="color: var(--text-color);">[小道具]</strong><br>`;
     scene.props.forEach(p => {
-      html += `<div style="padding: 8px; border-left: 2px solid #ccc; margin-bottom: 4px; background: rgba(0,0,0,0.02);">
+      html += `<div style="padding: 8px; border-left: 2px solid var(--border-color); margin-bottom: 4px; background: rgba(0,0,0,0.02);">
         <span class="status-color status-${p.status}" style="padding:2px 4px; font-size:11px;">${p.status}</span> 
         <strong>${p.name}</strong>
         ${p.desc ? `<div class="scene-info" style="margin-top: 2px;">${p.desc}</div>` : ''}
-        ${p.price ? `<div class="scene-info" style="color:#888;">${p.price}</div>` : ''}
+        ${p.price ? `<div class="scene-info" style="color:var(--muted-text);">${p.price}</div>` : ''}
       </div>`;
     });
     pList.innerHTML = html;
@@ -972,7 +1047,14 @@ function renderSceneEditDetail() {
   document.getElementById('edit-scene-number').value = scene.number || '';
   document.getElementById('edit-scene-name').value = scene.sceneName || '';
   document.getElementById('edit-scene-location').value = scene.location || '';
-  setDialDate('ed', scene.date);
+  
+  const dList = document.getElementById('edit-scene-dates');
+  dList.innerHTML = '';
+  if (scene.dates && scene.dates.length > 0) {
+    scene.dates.forEach(d => addDateInput('edit-scene-dates', d));
+  } else {
+    addDateInput('edit-scene-dates');
+  }
 
   const cList = document.getElementById('edit-costume-list');
   cList.innerHTML = '';
@@ -991,7 +1073,7 @@ function saveEditedScene() {
   scene.number = document.getElementById('edit-scene-number').value;
   scene.sceneName = document.getElementById('edit-scene-name').value;
   scene.location = document.getElementById('edit-scene-location').value;
-  scene.date = getDialDate('ed'); 
+  scene.dates = collectDatesFromContainer('edit-scene-dates'); 
   
   scene.costumes = collectItemsFromDOM('edit-costume-list');
   scene.props = collectItemsFromDOM('edit-prop-list');
@@ -1003,8 +1085,10 @@ function saveEditedScene() {
   alert('シーンの変更を保存しました。');
 }
 
+window.toggleEditorMode = toggleEditorMode;
 window.toggleDarkMode = toggleDarkMode;
-window.updateDays = updateDays;
+window.addDateInput = addDateInput;
+window.updateDaysInContainer = updateDaysInContainer;
 window.checkSceneInput = checkSceneInput;
 window.updateSelectColor = updateSelectColor;
 window.scrollToTop = scrollToTop;
@@ -1032,7 +1116,6 @@ window.setViewMode = setViewMode;
 window.updateSort = updateSort;
 window.addCostumeInput = addCostumeInput;
 window.addPropInput = addPropInput;
-window.autoFillItem = autoFillItem;
 window.saveEditedScene = saveEditedScene;
 window.clearSearch = clearSearch;
 window.renderSearchResults = renderSearchResults;

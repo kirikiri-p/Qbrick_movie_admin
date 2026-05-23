@@ -22,6 +22,8 @@ body.dark-mode {
 
 body { font-family: "Helvetica Neue", Arial, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; transition: background-color 0.2s; line-height: 1.6;}
 
+body:not(.editor-mode) .editor-only { display: none !important; }
+
 .header { background-color: var(--header-bg); color: #fdfdfd; padding: 12px 20px; font-weight: bold; position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--accent-color);}
 .header-left { display: flex; align-items: center; }
 .header-right { display: flex; align-items: center; gap: 8px; }
@@ -37,15 +39,20 @@ body { font-family: "Helvetica Neue", Arial, sans-serif; background-color: var(-
 
 .movie-list-item { display: flex; justify-content: space-between; align-items: center; }
 .movie-info { flex: 1; cursor: pointer; }
-.movie-actions { display: flex; gap: 8px; align-items: center; margin-left: 16px; z-index: 2; position: relative;}
+.movie-actions { display: flex; gap: 16px; align-items: center; margin-left: 16px; z-index: 2; position: relative;}
 .edit-title-btn, .delete-movie-btn { background-color: var(--card-bg); color: var(--text-color); border: 2px solid var(--border-color); padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; width: auto; margin: 0;}
 .edit-title-btn:hover { background-color: rgba(0,0,0,0.03); }
 
-.participation-toggle { background-color: var(--card-bg); color: var(--muted-text); border: 2px solid var(--border-color); padding: 8px 16px; width: auto; margin: 0; border-radius: 4px; font-size: 13px; font-weight: bold; transition: all 0.2s;}
-.participation-toggle.active { background-color: #e3f2fd; color: #1565c0; border-color: #1565c0; }
-body.dark-mode .participation-toggle.active { background-color: #0d3b75; color: #bbdefb; border-color: #bbdefb;}
+/* 🌟 iOS風のトグルスイッチです */
+.switch-container { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .slider { background-color: #4cd964; }
+input:checked + .slider:before { transform: translateX(20px); }
+.switch-label { font-size: 13px; font-weight: bold; color: var(--muted-text); }
 
-/* 🌟 ライトモードでも文字をくっきりさせる魔法です */
 input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 8px 10px; margin: 8px 0; border: 1px solid var(--border-color); box-sizing: border-box; font-size: 14px; background-color: var(--input-bg); color: var(--text-color) !important; opacity: 1;}
 input[type="file"] { margin: 8px 0; color: var(--text-color); font-size: 13px;}
 
@@ -71,7 +78,12 @@ details.inventory-accordion .accordion-content { padding: 8px 12px 12px 12px; ba
 .item-remove-btn { position: absolute; top: 8px; right: 8px; background: transparent; border: none; color: var(--muted-text); padding: 4px; width: auto; font-size: 16px; margin: 0; cursor: pointer;}
 .item-status { font-weight: bold; width: auto; padding: 4px 8px; margin-bottom: 8px; display: inline-block;}
 
-.date-dial-container { display: flex; gap: 8px; align-items: center; margin: 4px 0 12px 0; }
+/* 🌟 下からポンと出てくる候補チップの魔法です */
+.suggestion-container { display: flex; flex-wrap: wrap; gap: 4px; }
+.suggestion-chip { background-color: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-color); font-size: 11px; padding: 4px 8px; border-radius: 12px; margin-top: 4px; cursor: pointer; transition: 0.2s; white-space: nowrap;}
+.suggestion-chip:hover { background-color: rgba(0,0,0,0.05); border-color: var(--accent-color); }
+
+.date-dial-container { display: flex; gap: 8px; align-items: center; margin: 4px 0 8px 0; position: relative; padding-right: 32px;}
 .date-dial-container select { flex: 1; padding: 8px 4px; text-align: center;}
 .input-label { font-size: 12px; color: var(--muted-text); display: block; margin-top: 12px; font-weight: bold;}
 
@@ -154,9 +166,22 @@ body.dark-mode .view-toggles button.active { background-color: #333; color: #fff
 .detail-pane::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 0; border: 1px solid var(--bg-color);}
 
 @media (min-width: 800px) { .detail-pane.show-detail { display: block; animation: nyoki 0.2s ease-out forwards; } }
+
+/* 🌟 スマホ用の魔法です（カレンダーのドット化） */
 @media (max-width: 799px) {
   .split-layout { flex-direction: column; }
   .detail-pane.show-detail { display: block; max-height: none; overflow-y: visible; }
   .list-pane.hide-on-mobile { display: none; }
+  
+  .cal-marker { display: none !important; }
+  .cal-dot-container { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; margin-top: 6px; }
+  .cal-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .cal-dot-alert { background-color: #d32f2f; }
+  .cal-dot-ready { background-color: #388e3c; }
+  .cal-dot-used { background-color: #1976d2; }
+  .cal-dot-none { background-color: #888; }
+  body.dark-mode .cal-dot-alert { background-color: #ef5350; }
+  body.dark-mode .cal-dot-ready { background-color: #66bb6a; }
+  body.dark-mode .cal-dot-used { background-color: #42a5f5; }
 }
 @keyframes nyoki { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }

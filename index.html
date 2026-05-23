@@ -9,9 +9,6 @@
 </head>
 <body>
 
-<datalist id="costume-datalist"></datalist>
-<datalist id="prop-datalist"></datalist>
-
 <div id="app">
   <div class="header">
     <div class="header-left">
@@ -25,7 +22,7 @@
       </div>
     </div>
     <div class="header-right">
-      <button class="icon-btn hidden" id="header-search-btn" onclick="goSearch()">検索</button>
+      <button class="icon-btn hidden" id="header-search-btn" onclick="goSearch()">[検索]</button>
       <button class="icon-btn" onclick="toggleDarkMode()" id="dark-mode-btn">🌙</button>
     </div>
   </div>
@@ -34,7 +31,7 @@
     <h3 class="section-title">登録済みの映画一覧</h3>
     <div id="movie-list"></div>
 
-    <div class="card card-no-click" style="margin-top: 24px;">
+    <div class="card card-no-click editor-only" style="margin-top: 24px;">
       <h3>新しい映画を登録</h3>
       <input type="text" id="new-movie-title" placeholder="映画のタイトルを手入力">
       <button onclick="addMovie()">[+] 追加する</button>
@@ -46,6 +43,10 @@
     <div class="card card-no-click" style="margin-top: 24px;">
       <h3 style="color: #1976d2;">参加中の撮影スケジュール</h3>
       <div id="global-calendar"></div>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
+      <button id="editor-toggle-btn" class="secondary" style="width: auto; font-size: 13px; color: var(--muted-text); border: 1px solid var(--border-color);" onclick="toggleEditorMode()">[鍵] 編集者モードになる</button>
     </div>
   </div>
 
@@ -106,21 +107,22 @@
         
         <button class="secondary sticky-back-btn" onclick="goHome()">&lt; 映画一覧に戻る</button>
 
-        <div class="card card-no-click">
+        <div class="card card-no-click editor-only">
           <h3>新しいシーンを追加</h3>
-          <input type="number" id="new-scene-number" placeholder="シーン番号 (必須)" oninput="checkSceneInput()">
+          <!-- 🌟 プレースホルダーを具体的な例にしました！ -->
+          <input type="number" id="new-scene-number" placeholder="例: 13 (必須)" oninput="checkSceneInput()">
           
           <details class="accordion" id="new-scene-details">
             <summary>詳細情報を入力する</summary>
             <div class="accordion-content">
-              <input type="text" id="new-scene-name" placeholder="シーン名" oninput="checkSceneInput()">
-              <input type="text" id="new-scene-location" placeholder="場所" oninput="checkSceneInput()">
+              <input type="text" id="new-scene-name" placeholder="例: オープニング" oninput="checkSceneInput()">
+              <input type="text" id="new-scene-location" placeholder="例: 熊本大学北キャンパスくすのきホール" oninput="checkSceneInput()">
+              
+              <!-- 🌟 撮影日を複数追加できるように変更しました -->
               <label class="input-label">撮影日</label>
-              <div class="date-dial-container">
-                <select id="ns-year" onchange="updateDays('ns'); checkSceneInput();"></select><span>年</span>
-                <select id="ns-month" onchange="updateDays('ns'); checkSceneInput();"></select><span>月</span>
-                <select id="ns-day" onchange="checkSceneInput();"></select><span>日</span>
-              </div>
+              <div id="new-scene-dates"></div>
+              <button type="button" class="secondary" style="margin-top: 4px;" onclick="addDateInput('new-scene-dates')">[+] 撮影日を追加</button>
+              
               <details class="accordion sub-accordion"><summary>[+] 衣装詳細を追加</summary><div class="accordion-content"><div id="new-costume-list"></div><button type="button" class="secondary" onclick="addCostumeInput('new-costume-list')">[+] 衣装枠を追加</button></div></details>
               <details class="accordion sub-accordion"><summary>[+] 小道具詳細を追加</summary><div class="accordion-content"><div id="new-prop-list"></div><button type="button" class="secondary" onclick="addPropInput('new-prop-list')">[+] 小道具枠を追加</button></div></details>
             </div>
@@ -139,7 +141,7 @@
           <button id="btn-view-prop" onclick="setViewMode('prop')">小道具一覧</button>
         </div>
 
-        <button id="bulk-delete-btn" class="danger hidden" onclick="deleteSelectedScenes()" style="margin-bottom: 16px; margin-top: 0;">[削除] 選択したシーンをすべて削除</button>
+        <button id="bulk-delete-btn" class="danger hidden editor-only" onclick="deleteSelectedScenes()" style="margin-bottom: 16px; margin-top: 0;">[削除] 選択したシーンをすべて削除</button>
 
         <div id="scene-list"></div>
         <button class="secondary" onclick="goHome()">&lt; 映画一覧に戻る</button>
@@ -155,7 +157,7 @@
             <div id="view-scene-costumes" style="margin-bottom: 12px;"></div>
             <div id="view-scene-props"></div>
           </div>
-          <button onclick="openSceneEdit()">[編集] このシーンを編集する</button>
+          <button class="editor-only" onclick="openSceneEdit()">[編集] このシーンを編集する</button>
         </div>
 
         <div id="detail-pane-edit" class="hidden">
@@ -165,12 +167,10 @@
             <label class="input-label">シーン番号</label><input type="number" id="edit-scene-number">
             <label class="input-label">シーン名</label><input type="text" id="edit-scene-name">
             <label class="input-label">場所</label><input type="text" id="edit-scene-location">
+            
             <label class="input-label">撮影日を変更</label>
-            <div class="date-dial-container">
-              <select id="ed-year" onchange="updateDays('ed');"></select><span>年</span>
-              <select id="ed-month" onchange="updateDays('ed');"></select><span>月</span>
-              <select id="ed-day"></select><span>日</span>
-            </div>
+            <div id="edit-scene-dates"></div>
+            <button type="button" class="secondary" style="margin-top: 4px;" onclick="addDateInput('edit-scene-dates')">[+] 撮影日を追加</button>
           </div>
 
           <div class="card card-no-click">
