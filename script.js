@@ -21,7 +21,7 @@ let currentSceneId = null;
 let currentViewMode = 'list'; 
 let currentSort = 'num-asc'; 
 let selectedSceneIds = new Set(); 
-let lastViewHash = 'home'; // 🌟 ルーティング用の履歴です
+let lastViewHash = 'home'; 
 
 let isEditorMode = false;
 let globalCalYear = new Date().getFullYear();
@@ -40,7 +40,6 @@ function migrateSceneData(scene) {
   return scene;
 }
 
-// 🌟 ブラウザの戻る・進むボタンが使えるようにする「ルーティング」の魔法です！
 window.addEventListener('hashchange', (e) => {
   if (e.oldURL) {
     const oldHash = e.oldURL.split('#')[1];
@@ -82,11 +81,10 @@ onSnapshot(moviesRef, (snapshot) => {
     isInitialLoad = false;
     handleHash();
   } else {
-    handleHash(true); // 他の人の更新を画面に反映させます（入力途中の文字は守ります）
+    handleHash(true);
   }
 });
 
-// 🌟 ナビゲーション関数を、すべて「URLのハッシュを書き換えるだけ」に変更しました
 window.goHome = () => { window.location.hash = 'home'; };
 window.goMovie = (id) => { window.location.hash = 'movie/' + id; };
 window.goSearch = () => { window.location.hash = 'search/' + currentMovieId; };
@@ -96,7 +94,6 @@ window.backFromSearch = () => { window.location.hash = `movie/${currentMovieId}`
 window.closeSceneDetail = () => { window.location.hash = lastViewHash || `movie/${currentMovieId}`; };
 window.showDailyScenes = (dateStr) => { window.location.hash = `daily/${dateStr}`; };
 
-// ここから下が、実際に画面を切り替える内部の処理です……！
 function executeGoHome(isDataUpdate) {
   currentMovieId = null;
   renderHome(); 
@@ -385,7 +382,6 @@ window.handleExcelUpload = function(event) {
   reader.readAsArrayBuffer(file);
 };
 
-// 🌟 Excelで出力する魔法です！
 window.exportToExcel = function() {
   const movie = movies.find(m => m.id === currentMovieId);
   if(!movie) return;

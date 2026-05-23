@@ -57,7 +57,6 @@ input[type="file"] { margin: 8px 0; color: var(--text-color); font-size: 13px;}
 
 .template-download-link { display: block; margin-top: 8px; color: #1976d2; font-size: 13px; font-weight: bold; text-decoration: underline; }
 
-/* 🌟 PCでも確実に ▼ ▲ になるように書き方を直しました！ */
 details.accordion > summary { list-style: none; padding: 12px; cursor: pointer; font-weight: bold; background: rgba(0,0,0,0.03); display: block; border-bottom: 1px solid transparent;}
 details.accordion > summary::-webkit-details-marker { display: none; }
 details.accordion > summary::before { content: '▼ '; display: inline-block; font-size: 12px; margin-right: 4px; color: var(--muted-text);}
