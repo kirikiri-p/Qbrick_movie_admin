@@ -22,7 +22,7 @@
       </div>
     </div>
     <div class="header-right">
-      <button class="icon-btn hidden" id="header-search-btn" onclick="goSearch()">[検索]</button>
+      <button class="icon-btn hidden" id="header-search-btn" style="color: white !important;" onclick="goSearch()">検索</button>
       <button class="icon-btn" onclick="toggleDarkMode()" id="dark-mode-btn">🌙</button>
     </div>
   </div>
@@ -34,10 +34,12 @@
     <div class="card card-no-click editor-only" style="margin-top: 24px;">
       <h3>新しい映画を登録</h3>
       <input type="text" id="new-movie-title" placeholder="映画のタイトルを手入力">
-      <button onclick="addMovie()">[+] 追加する</button>
+      <button onclick="addMovie()">追加する</button>
       
       <h4 style="margin-top: 24px; color: var(--accent-color);">Excelから読み込む</h4>
       <input type="file" id="excel-upload" accept=".xlsx, .xls" onchange="handleExcelUpload(event)">
+      <!-- 🌟 テンプレートのダウンロードリンクです -->
+      <a href="Qbrick_管理テンプレート.xlsx" download class="template-download-link">📥 テンプレートをダウンロード</a>
     </div>
 
     <div class="card card-no-click" style="margin-top: 24px;">
@@ -46,7 +48,7 @@
     </div>
 
     <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
-      <button id="editor-toggle-btn" class="secondary" style="width: auto; font-size: 13px; color: var(--muted-text); border: 1px solid var(--border-color);" onclick="toggleEditorMode()">[鍵] 編集者モードになる</button>
+      <button id="editor-toggle-btn" class="secondary" style="width: auto; font-size: 13px; color: var(--muted-text); border: 1px solid var(--border-color);" onclick="toggleEditorMode()">編集者モードになる</button>
     </div>
   </div>
 
@@ -58,6 +60,10 @@
       <label class="input-label">映画タイトル</label>
       <input type="text" id="movie-detail-title">
       
+      <!-- 🌟 アイコンの登録欄を追加しました -->
+      <label class="input-label">アイコン (絵文字)</label>
+      <input type="text" id="movie-detail-icon" placeholder="例: 🎬" maxlength="2">
+
       <label class="input-label">種類</label>
       <select id="movie-detail-type">
         <option value="">未設定</option>
@@ -72,10 +78,10 @@
       <label class="input-label">年度</label>
       <input type="number" id="movie-detail-year" placeholder="例: 2026">
       
-      <button style="background-color: #2e7d32; border-color: #2e7d32; margin-top: 24px;" onclick="saveMovieDetails()">[保存] 更新して一覧に戻る</button>
+      <button style="background-color: #2e7d32; border-color: #2e7d32; margin-top: 24px;" onclick="saveMovieDetails()">更新して一覧に戻る</button>
     </div>
 
-    <button class="danger" onclick="deleteMovieFromDetails()">[削除] この映画を完全に削除する</button>
+    <button class="danger" onclick="deleteMovieFromDetails()">この映画を完全に削除する</button>
   </div>
 
   <div id="view-daily" class="container hidden">
@@ -109,25 +115,28 @@
 
         <div class="card card-no-click editor-only">
           <h3>新しいシーンを追加</h3>
-          <!-- 🌟 プレースホルダーを具体的な例にしました！ -->
-          <input type="number" id="new-scene-number" placeholder="例: 13 (必須)" oninput="checkSceneInput()">
+          <!-- 🌟 上のラベルと中のプレースホルダーを分けました -->
+          <label class="input-label">シーン番号（必須）</label>
+          <input type="number" id="new-scene-number" placeholder="例: 13" oninput="checkSceneInput()">
           
           <details class="accordion" id="new-scene-details">
             <summary>詳細情報を入力する</summary>
             <div class="accordion-content">
+              <label class="input-label">シーン名</label>
               <input type="text" id="new-scene-name" placeholder="例: オープニング" oninput="checkSceneInput()">
+              <label class="input-label">場所</label>
               <input type="text" id="new-scene-location" placeholder="例: 熊本大学北キャンパスくすのきホール" oninput="checkSceneInput()">
               
-              <!-- 🌟 撮影日を複数追加できるように変更しました -->
+              <!-- 🌟 撮影日をネイティブのDate入力に変えました！ -->
               <label class="input-label">撮影日</label>
               <div id="new-scene-dates"></div>
-              <button type="button" class="secondary" style="margin-top: 4px;" onclick="addDateInput('new-scene-dates')">[+] 撮影日を追加</button>
+              <button type="button" class="secondary" style="margin-top: 4px;" onclick="addDateInput('new-scene-dates')">撮影日を追加</button>
               
-              <details class="accordion sub-accordion"><summary>[+] 衣装詳細を追加</summary><div class="accordion-content"><div id="new-costume-list"></div><button type="button" class="secondary" onclick="addCostumeInput('new-costume-list')">[+] 衣装枠を追加</button></div></details>
-              <details class="accordion sub-accordion"><summary>[+] 小道具詳細を追加</summary><div class="accordion-content"><div id="new-prop-list"></div><button type="button" class="secondary" onclick="addPropInput('new-prop-list')">[+] 小道具枠を追加</button></div></details>
+              <details class="accordion sub-accordion"><summary>衣装詳細を追加</summary><div class="accordion-content"><div id="new-costume-list"></div><button type="button" class="secondary" onclick="addCostumeInput('new-costume-list')">衣装枠を追加</button></div></details>
+              <details class="accordion sub-accordion"><summary>小道具詳細を追加</summary><div class="accordion-content"><div id="new-prop-list"></div><button type="button" class="secondary" onclick="addPropInput('new-prop-list')">小道具枠を追加</button></div></details>
             </div>
           </details>
-          <button id="add-scene-btn" disabled onclick="addScene()">[+] 追加</button>
+          <button id="add-scene-btn" disabled onclick="addScene()">追加</button>
         </div>
         
         <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 32px; margin-bottom: 8px; border-bottom: 2px solid var(--header-bg); padding-bottom: 4px;">
@@ -141,7 +150,7 @@
           <button id="btn-view-prop" onclick="setViewMode('prop')">小道具一覧</button>
         </div>
 
-        <button id="bulk-delete-btn" class="danger hidden editor-only" onclick="deleteSelectedScenes()" style="margin-bottom: 16px; margin-top: 0;">[削除] 選択したシーンをすべて削除</button>
+        <button id="bulk-delete-btn" class="danger hidden editor-only" onclick="deleteSelectedScenes()" style="margin-bottom: 16px; margin-top: 0;">選択したシーンをすべて削除</button>
 
         <div id="scene-list"></div>
         <button class="secondary" onclick="goHome()">&lt; 映画一覧に戻る</button>
@@ -150,14 +159,14 @@
       <div class="detail-pane" id="detail-pane">
         
         <div id="detail-pane-view">
-          <button class="close-btn" onclick="closeSceneDetail()">[x] 閉じる</button>
+          <button class="close-btn" onclick="closeSceneDetail()">✕ 閉じる</button>
           <div class="card card-no-click">
             <h3 id="view-scene-header" style="margin-bottom: 4px;"></h3>
             <div id="view-scene-info" class="scene-info" style="margin-bottom: 16px;"></div>
             <div id="view-scene-costumes" style="margin-bottom: 12px;"></div>
             <div id="view-scene-props"></div>
           </div>
-          <button class="editor-only" onclick="openSceneEdit()">[編集] このシーンを編集する</button>
+          <button class="editor-only" onclick="openSceneEdit()">このシーンを編集する</button>
         </div>
 
         <div id="detail-pane-edit" class="hidden">
@@ -170,23 +179,23 @@
             
             <label class="input-label">撮影日を変更</label>
             <div id="edit-scene-dates"></div>
-            <button type="button" class="secondary" style="margin-top: 4px;" onclick="addDateInput('edit-scene-dates')">[+] 撮影日を追加</button>
+            <button type="button" class="secondary" style="margin-top: 4px;" onclick="addDateInput('edit-scene-dates')">撮影日を追加</button>
           </div>
 
           <div class="card card-no-click">
             <h3 style="color: #c2185b;">衣装の登録</h3>
             <div id="edit-costume-list"></div>
-            <button type="button" class="secondary" onclick="addCostumeInput('edit-costume-list')">[+] 衣装枠を追加</button>
+            <button type="button" class="secondary" onclick="addCostumeInput('edit-costume-list')">衣装枠を追加</button>
           </div>
 
           <div class="card card-no-click">
             <h3 style="color: #1976d2;">小道具の登録</h3>
             <div id="edit-prop-list"></div>
-            <button type="button" class="secondary" onclick="addPropInput('edit-prop-list')">[+] 小道具枠を追加</button>
+            <button type="button" class="secondary" onclick="addPropInput('edit-prop-list')">小道具枠を追加</button>
           </div>
           
-          <button style="background-color: #2e7d32; border-color: #2e7d32; padding: 16px; font-size: 16px; margin-bottom: 24px;" onclick="saveEditedScene()">[保存] このシーンの変更を保存</button>
-          <button class="danger" onclick="deleteScene()">[削除] このシーンだけ削除する</button>
+          <button style="background-color: #2e7d32; border-color: #2e7d32; padding: 16px; font-size: 16px; margin-bottom: 24px;" onclick="saveEditedScene()">このシーンの変更を保存</button>
+          <button class="danger" onclick="deleteScene()">このシーンだけ削除する</button>
         </div>
 
       </div>
