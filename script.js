@@ -73,6 +73,7 @@ function migrateSceneData(scene) {
     scene.props = [];
     if (scene.propName) { scene.propName.split(',').forEach((n, i) => { if(n.trim()) scene.props.push({ id: 'p'+Date.now()+i, name: n.trim(), status: scene.propStatus||'未着手', desc: scene.propDesc||'', price: scene.propPrice||'' }); }); }
   }
+  if (!scene.memo) scene.memo = '';
   return scene;
 }
 
@@ -758,7 +759,7 @@ window.addScene = function() {
   const newProps = collectItemsFromDOM('new-prop-list');
 
   movie.scenes.push({
-    id: Date.now(), number: num, sceneName: name, location: loc, dates: dates,
+    id: Date.now(), number: num, sceneName: name, location: loc, memo: memo, dates: dates,
     costumes: newCostumes, props: newProps
   });
 
@@ -1118,6 +1119,15 @@ function renderSceneViewDetail() {
   let dateText = (scene.dates && scene.dates.length > 0) ? scene.dates.join(', ') : '未定';
   let infoText = `場所: ${scene.location || '未定'} ｜ 撮影日: ${dateText}`;
   document.getElementById('view-scene-info').textContent = infoText;
+  const memoArea = document.getElementById('view-scene-memo');
+  if (memoArea) {
+    if (scene.memo) {
+      memoArea.innerHTML = `<strong>メモ</strong><br><div style="white-space: pre-wrap; background: rgba(0,0,0,0.03); padding: 8px; border-radius: 4px;">${scene.memo}</div>`;
+      memoArea.style.display = 'block';
+    } else {
+      memoArea.style.display = 'none';
+    }
+  }
 
   const cList = document.getElementById('view-scene-costumes');
   cList.innerHTML = '';
@@ -1162,7 +1172,8 @@ function renderSceneEditDetail() {
   document.getElementById('edit-scene-number').value = scene.number || '';
   document.getElementById('edit-scene-name').value = scene.sceneName || '';
   document.getElementById('edit-scene-location').value = scene.location || '';
-  
+  document.getElementById('edit-scene-memo').value = scene.memo || '';
+
   const dList = document.getElementById('edit-scene-dates');
   dList.innerHTML = '';
   if (scene.dates && scene.dates.length > 0) {
@@ -1188,6 +1199,7 @@ window.saveEditedScene = function() {
   scene.number = document.getElementById('edit-scene-number').value;
   scene.sceneName = document.getElementById('edit-scene-name').value;
   scene.location = document.getElementById('edit-scene-location').value;
+  scene.memo = document.getElementById('edit-scene-memo').value.trim();
   scene.dates = collectDatesFromContainer('edit-scene-dates'); 
   
   const newCostumes = collectItemsFromDOM('edit-costume-list');
