@@ -15,7 +15,7 @@
       <img src="image_441203.png" class="header-logo" alt="ロゴ">
       <div>
         <div class="breadcrumb">
-          <span class="breadcrumb-link" onclick="goHome()">ホーム ＞ 製作映画一覧</span>
+          <span class="breadcrumb-link" onclick="goHome()">ホーム</span>
           <span id="header-movie-title-nav" class="hidden breadcrumb-link" onclick="scrollToTop()"> ＞ <span id="header-title-sub">映画タイトル</span></span>
         </div>
         <span id="header-main-title" style="font-size: 18px;">製作映画一覧</span>
@@ -27,11 +27,9 @@
   <!-- ① ホーム：製作映画一覧 ＆ 全体カレンダー -->
   <div id="view-home" class="container">
     
-    <!-- 1. 登録済みの映画（参加・不参加を切り替える場所です） -->
     <h3 style="margin-top: 0;">🎬 登録済みの映画一覧</h3>
     <div id="movie-list"></div>
 
-    <!-- 2. 新しい映画の登録 -->
     <div class="card card-no-click" style="margin-top: 24px;">
       <h3>➕ 新しい映画を登録</h3>
       <input type="text" id="new-movie-title" placeholder="映画のタイトルを手入力">
@@ -41,15 +39,18 @@
       <input type="file" id="excel-upload" accept=".xlsx, .xls" onchange="handleExcelUpload(event)">
     </div>
 
-    <!-- 3. 参加映画の全体カレンダー -->
     <div class="card card-no-click" style="margin-top: 24px;">
       <h3 style="color: #1976d2;">📅 参加中の撮影スケジュール</h3>
       <div id="global-calendar"></div>
-      
-      <!-- 日付をクリックした時に、ここにシーンの一覧がふわりと出ます -->
-      <div id="daily-scene-list" style="margin-top: 16px;"></div>
     </div>
     
+  </div>
+
+  <!-- 🌟 新しい画面：カレンダーから飛んでくる「1日のシーン一覧」 -->
+  <div id="view-daily" class="container hidden">
+    <button class="secondary sticky-back-btn" onclick="goHome()">◀ カレンダーに戻る</button>
+    <h2 id="daily-date-title" style="border-bottom: 3px solid #1976d2; padding-bottom: 8px;">〇月〇日の撮影予定</h2>
+    <div id="daily-scene-list-container"></div>
   </div>
 
   <!-- ② 映画詳細（シーン一覧 ＆ 逆引き一覧） -->
@@ -62,19 +63,44 @@
 
         <div class="card card-no-click">
           <h3>新しいシーンを追加</h3>
-          <input type="number" id="scene-number" placeholder="シーン番号 (必須)" oninput="checkSceneInput()">
-          <input type="text" id="scene-name" placeholder="シーン名" oninput="checkSceneInput()">
-          <input type="text" id="scene-location" placeholder="場所" oninput="checkSceneInput()">
+          <input type="number" id="new-scene-number" placeholder="シーン番号 (必須)" oninput="checkSceneInput()">
           
-          <label class="input-label">📅 撮影日（ダイヤル入力）</label>
-          <div class="date-dial-container">
-            <select id="ns-year" onchange="updateDays('ns'); checkSceneInput();"></select>
-            <span>年</span>
-            <select id="ns-month" onchange="updateDays('ns'); checkSceneInput();"></select>
-            <span>月</span>
-            <select id="ns-day" onchange="checkSceneInput();"></select>
-            <span>日</span>
-          </div>
+          <!-- にゅるっと開くアコーディオンです -->
+          <details class="accordion" id="new-scene-details">
+            <summary>詳細情報を入力する</summary>
+            <div class="accordion-content">
+              <input type="text" id="new-scene-name" placeholder="シーン名" oninput="checkSceneInput()">
+              <input type="text" id="new-scene-location" placeholder="場所" oninput="checkSceneInput()">
+              
+              <label class="input-label">📅 撮影日（ダイヤル入力）</label>
+              <div class="date-dial-container">
+                <select id="ns-year" onchange="updateDays('ns'); checkSceneInput();"></select>
+                <span>年</span>
+                <select id="ns-month" onchange="updateDays('ns'); checkSceneInput();"></select>
+                <span>月</span>
+                <select id="ns-day" onchange="checkSceneInput();"></select>
+                <span>日</span>
+              </div>
+
+              <!-- さらににゅるっと開く衣装・小道具 -->
+              <details class="accordion sub-accordion">
+                <summary>👗 衣装詳細を追加</summary>
+                <div class="accordion-content">
+                  <div id="new-costume-list"></div>
+                  <button type="button" class="secondary" onclick="addCostumeInput('new-costume-list')">＋ 衣装枠を追加</button>
+                </div>
+              </details>
+
+              <details class="accordion sub-accordion">
+                <summary>📦 小道具詳細を追加</summary>
+                <div class="accordion-content">
+                  <div id="new-prop-list"></div>
+                  <button type="button" class="secondary" onclick="addPropInput('new-prop-list')">＋ 小道具枠を追加</button>
+                </div>
+              </details>
+
+            </div>
+          </details>
           
           <button id="add-scene-btn" disabled onclick="addScene()">シーンを追加</button>
         </div>
@@ -83,11 +109,6 @@
           <h3 style="border: none; margin: 0; padding: 0;">登録データの一覧</h3>
           
           <div class="sort-filter-bar" id="sort-filter-bar">
-            <select id="filter-select" onchange="updateFilter(this.value)">
-              <option value="all">すべて表示</option>
-              <option value="unfinished-cos">👗 衣装準備中・未着手</option>
-              <option value="unfinished-prop">📦 小道具準備中・未着手</option>
-            </select>
             <select id="sort-select" onchange="updateSort(this.value)">
               <option value="num-asc">番号順 (昇順)</option>
               <option value="num-desc">番号順 (降順)</option>
@@ -99,77 +120,57 @@
         
         <div class="view-toggles">
           <button id="btn-view-list" class="active" onclick="setViewMode('list')">📋 シーン順</button>
-          <button id="btn-view-cos" onclick="setViewMode('cos')">👗 衣装一覧 (最速順)</button>
-          <button id="btn-view-prop" onclick="setViewMode('prop')">📦 小道具一覧 (最速順)</button>
+          <button id="btn-view-cos" onclick="setViewMode('cos')">👗 衣装一覧</button>
+          <button id="btn-view-prop" onclick="setViewMode('prop')">📦 小道具一覧</button>
         </div>
+
+        <!-- 複数削除ボタン -->
+        <button id="bulk-delete-btn" class="danger hidden" onclick="deleteSelectedScenes()" style="margin-bottom: 16px; margin-top: 0;">🗑️ 選択したシーンをすべて削除</button>
 
         <div id="scene-list"></div>
         <button class="secondary" onclick="goHome()">◀ 映画一覧に戻る</button>
       </div>
 
-      <!-- 右側：シーンの詳細 -->
+      <!-- 右側：シーンの詳細（編集） -->
       <div class="detail-pane" id="detail-pane">
-        <button class="close-btn" onclick="closeSceneDetail()">✖ 詳細を閉じる</button>
+        <button class="close-btn" onclick="closeSceneDetail()">✖ 編集を閉じる</button>
 
         <div class="card card-no-click">
-          <h3>🎬 シーン基本情報の編集</h3>
+          <h3>🎬 シーン基本情報</h3>
           <label class="input-label">シーン番号</label>
-          <input type="number" id="edit-scene-number" placeholder="シーン番号" onchange="saveSceneBasicInfo()">
+          <input type="number" id="edit-scene-number" placeholder="シーン番号">
           <label class="input-label">シーン名</label>
-          <input type="text" id="edit-scene-name" placeholder="シーン名" onchange="saveSceneBasicInfo()">
+          <input type="text" id="edit-scene-name" placeholder="シーン名">
           <label class="input-label">場所</label>
-          <input type="text" id="edit-scene-location" placeholder="場所" onchange="saveSceneBasicInfo()">
+          <input type="text" id="edit-scene-location" placeholder="場所">
           
           <label class="input-label">📅 撮影日を変更</label>
           <div class="date-dial-container">
-            <select id="ed-year" onchange="updateDays('ed'); saveSceneBasicInfo();"></select>
+            <select id="ed-year" onchange="updateDays('ed');"></select>
             <span>年</span>
-            <select id="ed-month" onchange="updateDays('ed'); saveSceneBasicInfo();"></select>
+            <select id="ed-month" onchange="updateDays('ed');"></select>
             <span>月</span>
-            <select id="ed-day" onchange="saveSceneBasicInfo();"></select>
+            <select id="ed-day"></select>
             <span>日</span>
           </div>
         </div>
 
         <div class="card card-no-click">
           <h3 style="color: #c2185b;">👗 衣装の登録</h3>
-          <label class="input-label">ステータス（※シーン全体）</label>
-          <select id="edit-costume-status" class="status-color" onchange="updateSelectColor(this); saveSceneDetail();">
-            <option value="未着手">未着手</option>
-            <option value="準備中">準備中</option>
-            <option value="準備完了">準備完了</option>
-            <option value="使用済み">使用済み</option>
-          </select>
-          <label class="input-label">衣装名（複数ある場合はカンマ「,」で区切れます）</label>
-          <input type="text" id="edit-costume-name" list="costume-datalist" placeholder="例: 夏制服, ジャージ" onchange="saveSceneDetail()">
-          <datalist id="costume-datalist"></datalist>
-          
-          <label class="input-label">詳細</label>
-          <textarea id="edit-costume-desc" placeholder="衣装メイク詳細" onchange="saveSceneDetail()"></textarea>
-          <label class="input-label">金額/メモ</label>
-          <input type="text" id="edit-costume-price" placeholder="金額/メモ" onchange="saveSceneDetail()">
+          <div id="edit-costume-list"></div>
+          <button type="button" class="secondary" onclick="addCostumeInput('edit-costume-list')">＋ 衣装枠を追加</button>
         </div>
 
         <div class="card card-no-click">
           <h3 style="color: #1976d2;">📦 小道具の登録</h3>
-          <label class="input-label">ステータス（※シーン全体）</label>
-          <select id="edit-prop-status" class="status-color" onchange="updateSelectColor(this); saveSceneDetail();">
-            <option value="未着手">未着手</option>
-            <option value="準備中">準備中</option>
-            <option value="準備完了">準備完了</option>
-            <option value="使用済み">使用済み</option>
-          </select>
-          <label class="input-label">物品名（複数ある場合はカンマ「,」で区切れます）</label>
-          <input type="text" id="edit-prop-name" list="prop-datalist" placeholder="例: スマホ, 財布" onchange="saveSceneDetail()">
-          <datalist id="prop-datalist"></datalist>
-          
-          <label class="input-label">詳細</label>
-          <textarea id="edit-prop-desc" placeholder="小道具詳細" onchange="saveSceneDetail()"></textarea>
-          <label class="input-label">金額/メモ</label>
-          <input type="text" id="edit-prop-price" placeholder="金額/メモ" onchange="saveSceneDetail()">
+          <div id="edit-prop-list"></div>
+          <button type="button" class="secondary" onclick="addPropInput('edit-prop-list')">＋ 小道具枠を追加</button>
         </div>
         
-        <button class="danger" onclick="deleteScene()">🗑️ このシーンを削除する</button>
+        <!-- 今回から、明示的に「保存」を押すようにしました -->
+        <button style="background-color: #2e7d32; border-color: #2e7d32; padding: 16px; font-size: 16px; margin-bottom: 24px;" onclick="saveEditedScene()">💾 このシーンの変更を保存</button>
+
+        <button class="danger" onclick="deleteScene()">🗑️ このシーンだけ削除する</button>
       </div>
     </div>
   </div>

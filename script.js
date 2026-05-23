@@ -20,25 +20,59 @@ let currentMovieId = null;
 let currentSceneId = null;
 let currentViewMode = 'list'; 
 let currentSort = 'num-asc'; 
-let currentFilter = 'all'; 
+let selectedSceneIds = new Set(); // 🗑️ 複数削除用のチェックリストです
 
 let globalCalYear = new Date().getFullYear();
 let globalCalMonth = new Date().getMonth();
 
+// 🔄 古いカンマ区切りのデータを、新しい「箱」の形に変換する魔法です
+function migrateSceneData(scene) {
+  if (!scene.costumes) {
+    scene.costumes = [];
+    if (scene.costumeName) {
+      scene.costumeName.split(',').forEach((name, i) => {
+        if(name.trim()) {
+          scene.costumes.push({
+            id: 'c' + Date.now() + i, name: name.trim(),
+            status: scene.costumeStatus || '未着手', desc: scene.costumeDesc || '', price: scene.costumePrice || ''
+          });
+        }
+      });
+    }
+  }
+  if (!scene.props) {
+    scene.props = [];
+    if (scene.propName) {
+      scene.propName.split(',').forEach((name, i) => {
+        if(name.trim()) {
+          scene.props.push({
+            id: 'p' + Date.now() + i, name: name.trim(),
+            status: scene.propStatus || '未着手', desc: scene.propDesc || '', price: scene.propPrice || ''
+          });
+        }
+      });
+    }
+  }
+  return scene;
+}
+
 onSnapshot(moviesRef, (snapshot) => {
   movies = [];
   snapshot.forEach((doc) => {
-    movies.push(doc.data());
+    let data = doc.data();
+    data.scenes = data.scenes.map(migrateSceneData); // 読み込む時に変換します
+    movies.push(data);
   });
   
   if (currentMovieId) {
     if (!movies.find(m => m.id === currentMovieId)) {
       goHome();
     } else {
-      updateDataLists();
       renderMovie();
       if(currentSceneId) renderSceneDetail();
     }
+  } else if (document.getElementById('view-daily').classList.contains('hidden') === false) {
+    // 日別画面を開いていたら何もしません
   } else {
     renderHome();
   }
@@ -48,30 +82,38 @@ async function saveMovie(movie) {
   await setDoc(doc(db, "movies", movie.id.toString()), movie);
 }
 
-// 👤 個人のブラウザに参加情報を記憶する魔法です
+// ✏️ タイトルを編集する魔法
+function editMovieTitle(movieId, event) {
+  event.stopPropagation();
+  const movie = movies.find(m => m.id === movieId);
+  const newTitle = prompt("映画の新しいタイトルを入力してください……", movie.title);
+  if(newTitle && newTitle.trim() !== '') {
+    movie.title = newTitle.trim();
+    saveMovie(movie);
+  }
+}
+
 function getParticipation(movieId) {
-  return localStorage.getItem('part_' + movieId) === 'true'; // 初期設定は「不参加（false）」です
+  return localStorage.getItem('part_' + movieId) === 'true'; 
 }
 function toggleParticipation(movieId, event) {
   event.stopPropagation(); 
   const current = getParticipation(movieId);
   localStorage.setItem('part_' + movieId, current ? 'false' : 'true');
-  renderHome(); // Firebaseには送らず、自分の画面だけ更新します
+  renderHome(); 
 }
 
 let isDarkMode = false;
 function toggleDarkMode() {
   isDarkMode = !isDarkMode;
   const body = document.body;
-  const btn = document.getElementById('dark-mode-btn');
   if(isDarkMode) {
     body.classList.add('dark-mode');
-    btn.textContent = '☀️';
+    document.getElementById('dark-mode-btn').textContent = '☀️';
   } else {
     body.classList.remove('dark-mode');
-    btn.textContent = '🌙';
+    document.getElementById('dark-mode-btn').textContent = '🌙';
   }
-  if (currentSceneId) renderSceneDetail();
 }
 
 function initDateDials() {
@@ -143,16 +185,14 @@ function parseExcelDate(serial) {
 function showView(viewId) {
   document.getElementById('view-home').classList.add('hidden');
   document.getElementById('view-movie').classList.add('hidden');
+  document.getElementById('view-daily').classList.add('hidden');
   document.getElementById(viewId).classList.remove('hidden');
 }
 
-function scrollToTop() {
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
+function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
 function goHome() { 
   currentMovieId = null;
-  document.getElementById('daily-scene-list').innerHTML = ''; // カレンダーの下を綺麗にします
   renderHome(); 
   document.getElementById('header-movie-title-nav').classList.add('hidden');
   document.getElementById('header-main-title').textContent = '製作映画一覧';
@@ -162,18 +202,17 @@ function goHome() {
 function goMovie(movieId) { 
   currentMovieId = movieId; 
   closeSceneDetail();
+  selectedSceneIds.clear();
+  document.getElementById('bulk-delete-btn').classList.add('hidden');
+
   const movie = movies.find(m => m.id === currentMovieId);
-  
   document.getElementById('header-movie-title-nav').classList.remove('hidden');
   document.getElementById('header-title-sub').textContent = movie.title;
   document.getElementById('header-main-title').textContent = movie.title;
   
   currentSort = 'num-asc';
-  currentFilter = 'all';
   document.getElementById('sort-select').value = 'num-asc';
-  document.getElementById('filter-select').value = 'all';
   
-  updateDataLists(); 
   renderMovie(); 
   showView('view-movie'); 
 }
@@ -187,10 +226,8 @@ function goScene(sceneId, forceMovieId = null) {
   renderSceneDetail(); 
   const detailPane = document.getElementById('detail-pane');
   const listPane = document.getElementById('list-pane');
-
   detailPane.classList.add('show-detail');
   listPane.classList.add('hide-on-mobile'); 
-  
   if(window.innerWidth < 800) window.scrollTo(0, 0); 
 }
 
@@ -205,7 +242,6 @@ function addMovie() {
   const titleInput = document.getElementById('new-movie-title');
   const title = titleInput.value.trim();
   if (!title) return;
-  // 参加状況（isParticipating）はFirebaseに送らないように外しました……！
   const newMovie = { id: Date.now(), title: title, scenes: [] };
   saveMovie(newMovie); 
   titleInput.value = '';
@@ -214,7 +250,6 @@ function addMovie() {
 function handleExcelUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
-
   const reader = new FileReader();
   reader.onload = function(e) {
     const data = new Uint8Array(e.target.result);
@@ -227,13 +262,15 @@ function handleExcelUpload(event) {
     
     rows.forEach((row, index) => {
       if (!row || row.length === 0) return;
+      // 読み込み時にも新しい配列の形で作ります
+      const costumes = row[5] ? row[5].split(',').map((n,i)=>({id:'c'+Date.now()+i, name:n.trim(), status:row[4]||'未着手', desc:row[6]||'', price:row[7]||''})) : [];
+      const props = row[9] ? row[9].split(',').map((n,i)=>({id:'p'+Date.now()+i, name:n.trim(), status:row[8]||'未着手', desc:row[10]||'', price:row[11]||''})) : [];
+
       newScenes.push({
         id: Date.now() + index,
-        number: row[0] || '', 
-        date: parseExcelDate(row[1]),
+        number: row[0] || '', date: parseExcelDate(row[1]),
         sceneName: row[2] || '', location: row[3] || '',
-        costumeStatus: row[4] || '未着手', costumeName: row[5] || '', costumeDesc: row[6] || '', costumePrice: row[7] || '',
-        propStatus: row[8] || '未着手', propName: row[9] || '', propDesc: row[10] || '', propPrice: row[11] || ''
+        costumes: costumes, props: props
       });
     });
 
@@ -249,7 +286,6 @@ function handleExcelUpload(event) {
 function renderGlobalCalendar() {
   const container = document.getElementById('global-calendar');
   container.innerHTML = '';
-
   const header = document.createElement('div');
   header.className = 'cal-header';
   header.innerHTML = `
@@ -269,7 +305,6 @@ function renderGlobalCalendar() {
   let tr = document.createElement('tr');
   for(let i = 0; i < firstDay; i++) tr.appendChild(document.createElement('td'));
   
-  // 👤 個人のブラウザで「参加中」になっている映画のシーンだけを集めます
   let activeScenes = [];
   movies.forEach(m => {
     if(getParticipation(m.id)) {
@@ -285,7 +320,6 @@ function renderGlobalCalendar() {
     const dateStr = `${globalCalYear}-${('0'+(globalCalMonth+1)).slice(-2)}-${('0'+day).slice(-2)}`;
     const dayScenes = activeScenes.filter(item => item.scene.date === dateStr || item.scene.date === dateStr.replace(/-0/g, '-')); 
     
-    // その日に予定があれば、マス全体をクリックできるようにします
     if(dayScenes.length > 0) {
       td.style.cursor = 'pointer';
       td.style.backgroundColor = 'rgba(25, 118, 210, 0.05)';
@@ -294,8 +328,7 @@ function renderGlobalCalendar() {
       dayScenes.forEach(item => {
         const marker = document.createElement('span');
         marker.className = 'cal-marker';
-        marker.innerHTML = `⭕ [${item.movie.title}] シーン${item.scene.number}`;
-        // マスの中の文字を押した時も、ちゃんとシーン詳細に飛ぶようにします
+        marker.innerHTML = `⭕ [${item.movie.title}] S${item.scene.number}`;
         marker.onclick = (e) => { e.stopPropagation(); goScene(item.scene.id, item.movie.id); };
         td.appendChild(marker);
       });
@@ -307,27 +340,32 @@ function renderGlobalCalendar() {
   container.appendChild(table);
 }
 
-// 📅 カレンダーの日付をクリックした時に、リストを表示する魔法です
+// 🌟 カレンダーから「1日の予定画面」へ飛ぶ魔法です
 function showDailyScenes(dateStr, dayScenes) {
-  const container = document.getElementById('daily-scene-list');
-  let html = `<h4 style="border-bottom: 2px solid #1976d2; padding-bottom: 4px; color: var(--text-color);">📅 ${dateStr} の撮影予定</h4>`;
+  document.getElementById('header-movie-title-nav').classList.remove('hidden');
+  document.getElementById('header-title-sub').textContent = `${dateStr} の予定`;
+  document.getElementById('header-main-title').textContent = `${dateStr} の撮影予定`;
+  
+  document.getElementById('daily-date-title').textContent = `${dateStr} の撮影予定`;
+  const container = document.getElementById('daily-scene-list-container');
+  container.innerHTML = '';
   
   dayScenes.sort((a, b) => Number(a.scene.number) - Number(b.scene.number)).forEach(item => {
-    html += `
-      <div class="daily-scene-card" onclick="goScene(${item.scene.id}, ${item.movie.id})">
-        <strong style="color: #1976d2;">[${item.movie.title}] シーン ${item.scene.number}</strong><br>
-        <span class="scene-info">${item.scene.sceneName || '名称未設定'} ｜ ${item.scene.location || '場所未定'}</span>
-      </div>
-    `;
+    // 既存の createSceneCard を少しアレンジして表示します
+    const card = createSceneCard(item.scene, item.movie.id);
+    const titleObj = document.createElement('div');
+    titleObj.innerHTML = `<strong style="color: #1976d2; font-size: 14px;">🎬 映画: ${item.movie.title}</strong><hr style="border:0; border-top:1px dashed #ccc; margin: 4px 0;">`;
+    card.prepend(titleObj);
+    container.appendChild(card);
   });
-  container.innerHTML = html;
+  
+  showView('view-daily');
 }
 
 function changeGlobalCalMonth(diff) {
   globalCalMonth += diff;
   if(globalCalMonth < 0) { globalCalMonth = 11; globalCalYear--; }
   if(globalCalMonth > 11) { globalCalMonth = 0; globalCalYear++; }
-  document.getElementById('daily-scene-list').innerHTML = ''; // 月を変えたらリストは閉じます
   renderHome();
 }
 
@@ -344,15 +382,15 @@ function renderHome() {
     const div = document.createElement('div');
     div.className = 'card movie-list-item';
     
-    // ブラウザの記憶から状態を読み取ります
     const isPart = getParticipation(movie.id); 
     const toggleClass = isPart ? 'active' : '';
     const toggleText = isPart ? '🟢 参加' : '⚪ 不参加';
 
     div.innerHTML = `
       <div class="movie-info" onclick="goMovie(${movie.id})">
-        <strong>${movie.title}</strong><br>
-        <span class="scene-info">登録シーン数: ${movie.scenes.length}件</span>
+        <strong>${movie.title}</strong>
+        <button class="edit-title-btn" onclick="editMovieTitle(${movie.id}, event)" title="タイトルを編集">✏️</button>
+        <br><span class="scene-info" style="margin-left:auto;">${movie.scenes.length}件のシーン</span>
       </div>
       <button class="participation-toggle ${toggleClass}" onclick="toggleParticipation(${movie.id}, event)">${toggleText}</button>
     `;
@@ -361,32 +399,138 @@ function renderHome() {
 }
 
 function checkSceneInput() {
-  const num = document.getElementById('scene-number').value.trim();
-  const name = document.getElementById('scene-name').value.trim();
-  const loc = document.getElementById('scene-location').value.trim();
-  const date = getDialDate('ns');
+  const num = document.getElementById('new-scene-number').value.trim();
   const btn = document.getElementById('add-scene-btn');
-  btn.disabled = !(num !== '' && (name !== '' || loc !== '' || date !== ''));
+  btn.disabled = (num === '');
+}
+
+// 📦 衣装・小道具の入力枠を作る魔法です
+function createItemInputHTML(type, item = null) {
+  const id = item ? item.id : Date.now() + Math.random().toString(36).substring(2,7);
+  const status = item ? item.status : '未着手';
+  const name = item ? item.name : '';
+  const desc = item ? item.desc : '';
+  const price = item ? item.price : '';
+  
+  const div = document.createElement('div');
+  div.className = 'item-input-block';
+  div.dataset.id = id;
+  
+  div.innerHTML = `
+    <button type="button" class="item-remove-btn" onclick="this.closest('.item-input-block').remove()" title="この枠を消す">✖</button>
+    <select class="item-status status-color status-${status}" onchange="updateSelectColor(this)">
+      <option value="未着手" ${status==='未着手'?'selected':''}>未着手</option>
+      <option value="準備中" ${status==='準備中'?'selected':''}>準備中</option>
+      <option value="準備完了" ${status==='準備完了'?'selected':''}>準備完了</option>
+      <option value="使用済み" ${status==='使用済み'?'selected':''}>使用済み</option>
+    </select>
+    <input type="text" class="item-name" placeholder="${type==='costume'?'衣装名':'物品名'}" value="${name}" oninput="autoFillItem(this, '${type}')">
+    <textarea class="item-desc" placeholder="詳細">${desc}</textarea>
+    <input type="text" class="item-price" placeholder="金額/メモ" value="${price}">
+  `;
+  return div;
+}
+
+function addCostumeInput(containerId, item = null) {
+  document.getElementById(containerId).appendChild(createItemInputHTML('costume', item));
+}
+function addPropInput(containerId, item = null) {
+  document.getElementById(containerId).appendChild(createItemInputHTML('prop', item));
+}
+
+// ✨ 名前が完全一致したら、他の映画からも詳細をコピーしてくる魔法です
+function autoFillItem(inputElem, type) {
+  const name = inputElem.value.trim();
+  if(!name) return;
+  
+  let found = null;
+  // ぜんぶの映画の中から、同じ名前で「詳細」か「金額」が書かれているものを探します
+  for(let m of movies) {
+    for(let s of m.scenes) {
+       const items = type === 'costume' ? s.costumes : s.props;
+       if(!items) continue;
+       found = items.find(i => i.name === name && (i.desc || i.price));
+       if(found) break;
+    }
+    if(found) break;
+  }
+  
+  if(found) {
+    const block = inputElem.closest('.item-input-block');
+    const descInput = block.querySelector('.item-desc');
+    const priceInput = block.querySelector('.item-price');
+    if(descInput && !descInput.value) descInput.value = found.desc;
+    if(priceInput && !priceInput.value) priceInput.value = found.price;
+  }
+}
+
+// 箱（DOM）からデータの配列を作る魔法です
+function collectItemsFromDOM(containerId) {
+  const items = [];
+  document.querySelectorAll(`#${containerId} .item-input-block`).forEach(block => {
+    const name = block.querySelector('.item-name').value.trim();
+    if(name) {
+      items.push({
+        id: block.dataset.id,
+        status: block.querySelector('.item-status').value,
+        name: name,
+        desc: block.querySelector('.item-desc').value,
+        price: block.querySelector('.item-price').value
+      });
+    }
+  });
+  return items;
 }
 
 function addScene() {
-  const num = document.getElementById('scene-number').value.trim();
-  const name = document.getElementById('scene-name').value.trim();
-  const loc = document.getElementById('scene-location').value.trim();
+  const num = document.getElementById('new-scene-number').value.trim();
+  const name = document.getElementById('new-scene-name').value.trim();
+  const loc = document.getElementById('new-scene-location').value.trim();
   const date = getDialDate('ns');
 
   const movie = movies.find(m => m.id === currentMovieId);
   movie.scenes.push({
     id: Date.now(), number: num, sceneName: name, location: loc, date: date,
-    costumeStatus: '未着手', costumeName: '', costumeDesc: '', costumePrice: '',
-    propStatus: '未着手', propName: '', propDesc: '', propPrice: ''
+    costumes: collectItemsFromDOM('new-costume-list'),
+    props: collectItemsFromDOM('new-prop-list')
   });
 
   saveMovie(movie); 
-  document.getElementById('scene-number').value = '';
-  document.getElementById('scene-name').value = '';
-  document.getElementById('scene-location').value = '';
+  
+  // 入力欄のお掃除と、にゅるっと開いたアコーディオンを閉じます
+  document.getElementById('new-scene-number').value = '';
+  document.getElementById('new-scene-name').value = '';
+  document.getElementById('new-scene-location').value = '';
+  document.getElementById('new-costume-list').innerHTML = '';
+  document.getElementById('new-prop-list').innerHTML = '';
+  document.getElementById('new-scene-details').removeAttribute('open');
+  
   checkSceneInput();
+}
+
+// 🗑️ チェックしたシーンをまとめて消す魔法
+function toggleSceneSelection(sceneId, checkbox, event) {
+  event.stopPropagation();
+  if(checkbox.checked) selectedSceneIds.add(sceneId);
+  else selectedSceneIds.delete(sceneId);
+  
+  const btn = document.getElementById('bulk-delete-btn');
+  if(selectedSceneIds.size > 0) btn.classList.remove('hidden');
+  else btn.classList.add('hidden');
+  
+  const card = checkbox.closest('.card');
+  if(checkbox.checked) card.classList.add('selected-card');
+  else card.classList.remove('selected-card');
+}
+
+function deleteSelectedScenes() {
+  if(confirm(`${selectedSceneIds.size}件のシーンを削除しますか……？`)) {
+    const movie = movies.find(m => m.id === currentMovieId);
+    movie.scenes = movie.scenes.filter(s => !selectedSceneIds.has(s.id));
+    selectedSceneIds.clear();
+    document.getElementById('bulk-delete-btn').classList.add('hidden');
+    saveMovie(movie);
+  }
 }
 
 function deleteScene() {
@@ -399,28 +543,13 @@ function deleteScene() {
   }
 }
 
-function splitItems(text) {
-  if(!text) return [];
-  return text.replace(/、/g, ',').split(',').map(i => i.trim()).filter(i => i !== '');
-}
-
-function getUniqueItems(movie, typeKey) {
-  const items = new Set();
+function getUniqueItemNames(movie, typeKey) {
+  const names = new Set();
   movie.scenes.forEach(s => {
-    splitItems(s[typeKey]).forEach(item => items.add(item));
+    const items = typeKey === 'costumes' ? s.costumes : s.props;
+    items.forEach(item => names.add(item.name));
   });
-  return Array.from(items);
-}
-
-function updateDataLists() {
-  if(!currentMovieId) return;
-  const movie = movies.find(m => m.id === currentMovieId);
-  const cList = document.getElementById('costume-datalist');
-  const pList = document.getElementById('prop-datalist');
-  
-  cList.innerHTML = ''; pList.innerHTML = '';
-  getUniqueItems(movie, 'costumeName').sort().forEach(i => cList.appendChild(new Option(i)));
-  getUniqueItems(movie, 'propName').sort().forEach(i => pList.appendChild(new Option(i)));
+  return Array.from(names);
 }
 
 function setViewMode(mode) {
@@ -438,49 +567,62 @@ function setViewMode(mode) {
 }
 
 function updateSort(val) { currentSort = val; renderMovie(); }
-function updateFilter(val) { currentFilter = val; renderMovie(); }
 
-function createSceneCard(scene) {
+function createSceneCard(scene, forceMovieId = null) {
   const div = document.createElement('div');
   div.className = 'card';
   if(scene.id === currentSceneId) div.style.border = '2px solid var(--accent-color)';
+  if(selectedSceneIds.has(scene.id)) div.classList.add('selected-card');
 
-  let html = `<strong>シーン ${scene.number}</strong>`;
+  let html = `<div class="scene-card-header">`;
+  
+  // 日別画面(forceMovieIdがある時)はチェックボックスを出さないようにします
+  if(!forceMovieId) {
+    html += `<input type="checkbox" class="scene-checkbox" ${selectedSceneIds.has(scene.id)?'checked':''} onclick="toggleSceneSelection(${scene.id}, this, event)">`;
+  }
+  
+  html += `<div class="scene-content">`;
+  html += `<strong>シーン ${scene.number}</strong>`;
   if(scene.sceneName) html += ` ｜ ${scene.sceneName}`;
   if(scene.location) html += ` ｜ ${scene.location}`;
-  html += `<div class="scene-info">撮影日: ${scene.date || '未定'}<br>`;
+  html += `<div class="scene-info">撮影日: ${scene.date || '未定'}</div>`;
   
-  if(scene.costumeName) html += `👗 ${scene.costumeName}<br>`;
-  if(scene.propName) html += `📦 ${scene.propName}<br>`;
-  html += `</div>`;
+  html += `<div style="margin-top: 8px;">`;
+  if(scene.costumes && scene.costumes.length > 0) {
+    html += `👗 `;
+    scene.costumes.forEach(c => html += `<span class="item-badge">${c.name} (${c.status})</span>`);
+    html += `<br>`;
+  }
+  if(scene.props && scene.props.length > 0) {
+    html += `📦 `;
+    scene.props.forEach(p => html += `<span class="item-badge">${p.name} (${p.status})</span>`);
+  }
+  html += `</div></div></div>`;
   
-  html += `
-    <div style="margin-top: 8px;">
-      <span class="status-badge status-${scene.costumeStatus}">衣装: ${scene.costumeStatus}</span>
-      <span class="status-badge status-${scene.propStatus}">小道具: ${scene.propStatus}</span>
-    </div>
-  `;
   div.innerHTML = html;
-  div.onclick = () => goScene(scene.id);
+  div.onclick = () => goScene(scene.id, forceMovieId);
   return div;
 }
 
 function getEarliestDate(movie, typeKey, itemName) {
-  const scenes = movie.scenes.filter(s => splitItems(s[typeKey]).includes(itemName) && s.date);
+  const scenes = movie.scenes.filter(s => {
+    const items = typeKey === 'costumes' ? s.costumes : s.props;
+    return items.some(i => i.name === itemName) && s.date;
+  });
   if(scenes.length === 0) return null;
   const dates = scenes.map(s => s.date).sort();
   return dates[0];
 }
 
 function renderInventory(movie, listContainer, typeKey, icon) {
-  let uniqueItems = getUniqueItems(movie, typeKey);
+  let uniqueNames = getUniqueItemNames(movie, typeKey);
   
-  if(uniqueItems.length === 0) {
+  if(uniqueNames.length === 0) {
     listContainer.innerHTML = '<p class="scene-info">まだ登録されていません。</p>';
     return;
   }
 
-  uniqueItems.sort((a, b) => {
+  uniqueNames.sort((a, b) => {
     let dateA = getEarliestDate(movie, typeKey, a);
     let dateB = getEarliestDate(movie, typeKey, b);
     if(!dateA && !dateB) return 0; 
@@ -489,14 +631,17 @@ function renderInventory(movie, listContainer, typeKey, icon) {
     return dateA.localeCompare(dateB);
   });
 
-  uniqueItems.forEach(item => {
-    const earliest = getEarliestDate(movie, typeKey, item);
+  uniqueNames.forEach(name => {
+    const earliest = getEarliestDate(movie, typeKey, name);
     const header = document.createElement('h4');
     header.className = 'inventory-header';
-    header.innerHTML = `${icon} ${item} <span style="font-size:12px; color:#666; font-weight:normal;">(最速使用日: ${earliest || '未定'})</span>`;
+    header.innerHTML = `${icon} ${name} <span style="font-size:12px; color:#666; font-weight:normal;">(最速使用日: ${earliest || '未定'})</span>`;
     listContainer.appendChild(header);
     
-    const matchingScenes = movie.scenes.filter(s => splitItems(s[typeKey]).includes(item));
+    const matchingScenes = movie.scenes.filter(s => {
+      const items = typeKey === 'costumes' ? s.costumes : s.props;
+      return items.some(i => i.name === name);
+    });
     matchingScenes.sort((a, b) => Number(a.number) - Number(b.number)).forEach(scene => {
       listContainer.appendChild(createSceneCard(scene));
     });
@@ -514,17 +659,11 @@ function renderMovie() {
   }
 
   if (currentViewMode === 'cos') {
-    renderInventory(movie, list, 'costumeName', '👗');
+    renderInventory(movie, list, 'costumes', '👗');
   } else if (currentViewMode === 'prop') {
-    renderInventory(movie, list, 'propName', '📦');
+    renderInventory(movie, list, 'props', '📦');
   } else {
     let displayScenes = [...movie.scenes];
-
-    if(currentFilter === 'unfinished-cos') {
-      displayScenes = displayScenes.filter(s => s.costumeStatus === '未着手' || s.costumeStatus === '準備中');
-    } else if (currentFilter === 'unfinished-prop') {
-      displayScenes = displayScenes.filter(s => s.propStatus === '未着手' || s.propStatus === '準備中');
-    }
 
     displayScenes.sort((a, b) => {
       if(currentSort === 'num-asc') return Number(a.number) - Number(b.number);
@@ -539,7 +678,6 @@ function renderMovie() {
     });
 
     displayScenes.forEach(scene => list.appendChild(createSceneCard(scene)));
-    if(displayScenes.length === 0) list.innerHTML = '<p class="scene-info">条件に合うシーンがありませんでした……。</p>';
   }
 }
 
@@ -553,22 +691,17 @@ function renderSceneDetail() {
   document.getElementById('edit-scene-location').value = scene.location || '';
   setDialDate('ed', scene.date);
 
-  const cStatus = document.getElementById('edit-costume-status');
-  cStatus.value = scene.costumeStatus || '未着手';
-  updateSelectColor(cStatus); 
-  document.getElementById('edit-costume-name').value = scene.costumeName || '';
-  document.getElementById('edit-costume-desc').value = scene.costumeDesc || '';
-  document.getElementById('edit-costume-price').value = scene.costumePrice || '';
-  
-  const pStatus = document.getElementById('edit-prop-status');
-  pStatus.value = scene.propStatus || '未着手';
-  updateSelectColor(pStatus); 
-  document.getElementById('edit-prop-name').value = scene.propName || '';
-  document.getElementById('edit-prop-desc').value = scene.propDesc || '';
-  document.getElementById('edit-prop-price').value = scene.propPrice || '';
+  const cList = document.getElementById('edit-costume-list');
+  cList.innerHTML = '';
+  scene.costumes.forEach(c => addCostumeInput('edit-costume-list', c));
+
+  const pList = document.getElementById('edit-prop-list');
+  pList.innerHTML = '';
+  scene.props.forEach(p => addPropInput('edit-prop-list', p));
 }
 
-function saveSceneBasicInfo() {
+// 💾 右ペインの「変更を保存」ボタンが押された時の魔法です
+function saveEditedScene() {
   if(!currentSceneId) return;
   const movie = movies.find(m => m.id === currentMovieId);
   const scene = movie.scenes.find(s => s.id === currentSceneId);
@@ -578,25 +711,11 @@ function saveSceneBasicInfo() {
   scene.location = document.getElementById('edit-scene-location').value;
   scene.date = getDialDate('ed'); 
   
-  saveMovie(movie); 
-}
-
-function saveSceneDetail() {
-  if(!currentSceneId) return;
-  const movie = movies.find(m => m.id === currentMovieId);
-  const scene = movie.scenes.find(s => s.id === currentSceneId);
-  
-  scene.costumeStatus = document.getElementById('edit-costume-status').value;
-  scene.costumeName = document.getElementById('edit-costume-name').value;
-  scene.costumeDesc = document.getElementById('edit-costume-desc').value;
-  scene.costumePrice = document.getElementById('edit-costume-price').value;
-  
-  scene.propStatus = document.getElementById('edit-prop-status').value;
-  scene.propName = document.getElementById('edit-prop-name').value;
-  scene.propDesc = document.getElementById('edit-prop-desc').value;
-  scene.propPrice = document.getElementById('edit-prop-price').value;
+  scene.costumes = collectItemsFromDOM('edit-costume-list');
+  scene.props = collectItemsFromDOM('edit-prop-list');
 
   saveMovie(movie); 
+  alert('シーンの変更を保存しました');
 }
 
 window.toggleDarkMode = toggleDarkMode;
@@ -609,14 +728,18 @@ window.goMovie = goMovie;
 window.goScene = goScene;
 window.closeSceneDetail = closeSceneDetail;
 window.addMovie = addMovie;
+window.editMovieTitle = editMovieTitle;
 window.toggleParticipation = toggleParticipation;
 window.handleExcelUpload = handleExcelUpload;
 window.changeGlobalCalMonth = changeGlobalCalMonth;
 window.showDailyScenes = showDailyScenes;
 window.addScene = addScene;
 window.deleteScene = deleteScene;
+window.toggleSceneSelection = toggleSceneSelection;
+window.deleteSelectedScenes = deleteSelectedScenes;
 window.setViewMode = setViewMode;
 window.updateSort = updateSort;
-window.updateFilter = updateFilter;
-window.saveSceneBasicInfo = saveSceneBasicInfo;
-window.saveSceneDetail = saveSceneDetail;
+window.addCostumeInput = addCostumeInput;
+window.addPropInput = addPropInput;
+window.autoFillItem = autoFillItem;
+window.saveEditedScene = saveEditedScene;
