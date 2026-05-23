@@ -25,7 +25,7 @@
       </div>
     </div>
     <div class="header-right">
-      <button class="icon-btn hidden" id="header-search-btn" onclick="goSearch()">[検索]</button>
+      <button class="icon-btn hidden" id="header-search-btn" onclick="goSearch()">検索</button>
       <button class="icon-btn" onclick="toggleDarkMode()" id="dark-mode-btn">🌙</button>
     </div>
   </div>
@@ -49,7 +49,6 @@
     </div>
   </div>
 
-  <!-- 🌟 新しいお部屋：映画の基本情報を登録・編集する画面です -->
   <div id="view-movie-details" class="container hidden">
     <button class="secondary sticky-back-btn" onclick="goHome()">&lt; 映画一覧に戻る</button>
     <h2 class="section-title">映画の基本情報</h2>
@@ -85,7 +84,6 @@
   </div>
 
   <div id="view-search" class="container hidden">
-    <!-- 修正：しっかり映画詳細に戻れるように直しました……！ -->
     <button class="secondary sticky-back-btn" onclick="backFromSearch()">&lt; 映画詳細に戻る</button>
     <h2 class="section-title">シーンの検索</h2>
     
@@ -149,7 +147,6 @@
 
       <div class="detail-pane" id="detail-pane">
         
-        <!-- 🌟 新しい機能：まずは「見るだけ」の画面を出します -->
         <div id="detail-pane-view">
           <button class="close-btn" onclick="closeSceneDetail()">[x] 閉じる</button>
           <div class="card card-no-click">
@@ -161,7 +158,6 @@
           <button onclick="openSceneEdit()">[編集] このシーンを編集する</button>
         </div>
 
-        <!-- 編集ボタンを押すと、こっちの入力画面に切り替わります -->
         <div id="detail-pane-edit" class="hidden">
           <button class="close-btn" onclick="cancelSceneEdit()">&lt; 編集をキャンセル</button>
           <div class="card card-no-click">

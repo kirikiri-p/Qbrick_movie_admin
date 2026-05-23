@@ -21,6 +21,7 @@ let currentSceneId = null;
 let currentViewMode = 'list'; 
 let currentSort = 'num-asc'; 
 let selectedSceneIds = new Set(); 
+let lastViewBeforeDetail = null; // 🌟 どこから詳細を開いたかを覚えておく魔法です
 
 let globalCalYear = new Date().getFullYear();
 let globalCalMonth = new Date().getMonth();
@@ -68,9 +69,9 @@ onSnapshot(moviesRef, (snapshot) => {
       }
       if(currentSceneId) {
         if(document.getElementById('detail-pane-edit').classList.contains('hidden')) {
-          renderSceneViewDetail(); // 閲覧モードの更新
+          renderSceneViewDetail(); 
         } else {
-          renderSceneEditDetail(); // 編集モードの更新
+          renderSceneEditDetail(); 
         }
       }
     }
@@ -85,7 +86,6 @@ async function saveMovie(movie) {
   await setDoc(doc(db, "movies", movie.id.toString()), movie);
 }
 
-// 🌟 映画詳細画面（監督や年度の登録）の魔法です
 function goMovieDetails(movieId) {
   currentMovieId = movieId;
   const movie = movies.find(m => m.id === currentMovieId);
@@ -117,8 +117,9 @@ async function deleteMovieFromDetails() {
 }
 
 function getParticipation(movieId) { return localStorage.getItem('part_' + movieId) === 'true'; }
-function toggleParticipation(movieId, event) {
-  event.stopPropagation(); 
+
+// 🌟 参加ボタンが確実に押せるように直しました
+function toggleParticipation(movieId) {
   const current = getParticipation(movieId);
   localStorage.setItem('part_' + movieId, current ? 'false' : 'true');
   renderHome(); 
@@ -224,6 +225,7 @@ function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
 function goHome() { 
   currentMovieId = null;
+  lastViewBeforeDetail = null;
   renderHome(); 
   document.getElementById('header-movie-title-nav').classList.add('hidden');
   document.getElementById('header-main-title').textContent = '製作映画一覧';
@@ -232,7 +234,7 @@ function goHome() {
 
 function goMovie(movieId) { 
   currentMovieId = movieId; 
-  closeSceneDetail();
+  closeSceneDetail(true); // 強制的に閉じる
   selectedSceneIds.clear();
   document.getElementById('bulk-delete-btn').classList.add('hidden');
 
@@ -254,20 +256,26 @@ function goSearch() {
   showView('view-search');
 }
 
-// 🌟 検索からちゃんと戻るための魔法です
 function backFromSearch() {
   showView('view-movie');
   renderMovie();
 }
 
 function goScene(sceneId, forceMovieId = null) { 
+  // 🌟 現在どの画面から飛んできたかを記憶します
+  const currentVisibleView = ['view-home', 'view-movie', 'view-daily', 'view-search', 'view-movie-details'].find(id => !document.getElementById(id).classList.contains('hidden'));
+  if (currentVisibleView && currentVisibleView !== 'view-movie') {
+    lastViewBeforeDetail = currentVisibleView;
+  }
+
   if(forceMovieId) {
     currentMovieId = forceMovieId;
-    goMovie(currentMovieId); // この中で view-movie になります
+    document.getElementById('header-movie-title-nav').classList.remove('hidden');
+    const movie = movies.find(m => m.id === currentMovieId);
+    document.getElementById('header-title-sub').textContent = movie.title;
   }
   currentSceneId = sceneId; 
   
-  // 🌟 シーンを押した時は、まず「見るだけ（View）」の画面を出します
   document.getElementById('detail-pane-edit').classList.add('hidden');
   document.getElementById('detail-pane-view').classList.remove('hidden');
   renderSceneViewDetail(); 
@@ -277,10 +285,12 @@ function goScene(sceneId, forceMovieId = null) {
   detailPane.classList.add('show-detail');
   listPane.classList.add('hide-on-mobile'); 
   
+  showView('view-movie'); // 詳細ペインを開くためにベースは view-movie にします
+  renderMovie();
+  
   if(window.innerWidth < 800) window.scrollTo(0, 0); 
 }
 
-// 🌟 「編集する」ボタンを押した時の魔法です
 function openSceneEdit() {
   document.getElementById('detail-pane-view').classList.add('hidden');
   document.getElementById('detail-pane-edit').classList.remove('hidden');
@@ -292,11 +302,19 @@ function cancelSceneEdit() {
   document.getElementById('detail-pane-view').classList.remove('hidden');
 }
 
-function closeSceneDetail() {
+// 🌟 閉じた時に、元の画面に戻れるようにしました！
+function closeSceneDetail(forceReset = false) {
   document.getElementById('detail-pane').classList.remove('show-detail');
   document.getElementById('list-pane').classList.remove('hide-on-mobile');
   currentSceneId = null;
-  renderMovie(); 
+  
+  if (!forceReset && lastViewBeforeDetail) {
+    showView(lastViewBeforeDetail);
+    if (lastViewBeforeDetail === 'view-search') renderSearchResults();
+    lastViewBeforeDetail = null;
+  } else {
+    renderMovie(); 
+  }
 }
 
 function addMovie() {
@@ -351,10 +369,9 @@ function handleExcelUpload(event) {
   reader.readAsArrayBuffer(file);
 }
 
-// 🌟 シーン全体の達成度（色）を判定する魔法です
 function getSceneOverallStatus(scene) {
   const items = [...(scene.costumes || []), ...(scene.props || [])];
-  if(items.length === 0) return 'none'; // アイテムがなければ色なし
+  if(items.length === 0) return 'none'; 
   
   let hasAlert = false;
   let allUsed = true;
@@ -366,9 +383,9 @@ function getSceneOverallStatus(scene) {
     if(i.status !== '準備完了' && i.status !== '使用済み') allReadyOrUsed = false;
   });
 
-  if(hasAlert) return 'alert';       // 赤（どれか一つでも未達成がある）
-  if(allUsed) return 'used';         // 青（すべて使用済み）
-  if(allReadyOrUsed) return 'ready'; // 緑（すべて準備完了か使用済み）
+  if(hasAlert) return 'alert';       
+  if(allUsed) return 'used';         
+  if(allReadyOrUsed) return 'ready'; 
   return 'none';
 }
 
@@ -417,7 +434,7 @@ function renderGlobalCalendar() {
       dayScenes.forEach(item => {
         const overall = getSceneOverallStatus(item.scene);
         const marker = document.createElement('span');
-        marker.className = `cal-marker cal-marker-${overall}`; // カレンダーにも色をつけます！
+        marker.className = `cal-marker cal-marker-${overall}`; 
         marker.innerHTML = `[${item.movie.title}] S${item.scene.number}`;
         marker.onclick = (e) => { e.stopPropagation(); goScene(item.scene.id, item.movie.id); };
         td.appendChild(marker);
@@ -484,7 +501,8 @@ function renderHome() {
         <div class="scene-info" style="margin-left: 12px; margin-top: 0;">${detailText}</div>
       </div>
       <div class="movie-actions">
-        <button class="participation-toggle ${toggleClass}" onclick="toggleParticipation(${movie.id}, event)">${toggleText}</button>
+        <!-- 🌟 ボタンが確実に押せるように直しました！ -->
+        <button class="participation-toggle ${toggleClass}" onclick="event.stopPropagation(); toggleParticipation(${movie.id})">${toggleText}</button>
         <button class="edit-title-btn" onclick="event.stopPropagation(); goMovieDetails(${movie.id})">[編集]</button>
       </div>
     `;
@@ -539,8 +557,7 @@ function autoFillItem(inputElem, type) {
   let found = null;
   for(let m of movies) {
     for(let s of m.scenes) {
-       const items = type === 'costume' ? s.costumes : s.props;
-       if(!items) continue;
+       const items = (type === 'costume' ? s.costumes : s.props) || [];
        found = items.find(i => i.name === name && (i.desc || i.price));
        if(found) break;
     }
@@ -645,9 +662,9 @@ function getUniqueProperties(movie, propName) {
     if(s[propName]) items.add(s[propName]);
   });
   let arr = Array.from(items).filter(x => x);
-  // シーン番号の選択肢が数字順になるように賢くしました……！
+  // 🌟 自然な順番で並ぶようにしました！（例：1, 2, 13, 15...）
   if (propName === 'number') {
-    arr.sort((a, b) => Number(a) - Number(b));
+    arr.sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
   } else {
     arr.sort();
   }
@@ -656,7 +673,7 @@ function getUniqueProperties(movie, propName) {
 function getUniqueItemNames(movie, typeKey) {
   const names = new Set();
   movie.scenes.forEach(s => {
-    const items = typeKey === 'costumes' ? s.costumes : s.props;
+    const items = (typeKey === 'costumes' ? s.costumes : s.props) || [];
     items.forEach(item => names.add(item.name));
   });
   return Array.from(names).sort();
@@ -700,6 +717,7 @@ function updateDataLists() {
   getUniqueItemNames(movie, 'props').forEach(i => pList.appendChild(new Option(i)));
 }
 
+// 🌟 エラーで止まらないように安全な書き方に直しました
 function setViewMode(mode) {
   currentViewMode = mode;
   ['list', 'cos', 'prop'].forEach(id => {
@@ -717,9 +735,9 @@ function setViewMode(mode) {
     currentSort = 'num-asc';
     sortSel.value = 'num-asc';
   } else {
+    sortSel.add(new Option('使用シーンが多い順', 'count-desc')); // デフォルトをこれにしました
     sortSel.add(new Option('名前順', 'name-asc'));
     sortSel.add(new Option('最速使用日が早い順', 'date-asc'));
-    sortSel.add(new Option('使用シーンが多い順', 'count-desc'));
     currentSort = 'count-desc';
     sortSel.value = 'count-desc';
   }
@@ -735,7 +753,6 @@ function createSceneCard(scene, forceMovieId = null) {
   if(scene.id === currentSceneId) div.style.border = '2px solid var(--accent-color)';
   if(selectedSceneIds.has(scene.id)) div.classList.add('selected-card');
 
-  // 🌟 全体の達成度から、左端に色線を引きます
   const overall = getSceneOverallStatus(scene);
   div.classList.add(`scene-border-${overall}`);
 
@@ -768,7 +785,7 @@ function createSceneCard(scene, forceMovieId = null) {
 
 function getEarliestDate(movie, typeKey, itemName) {
   const scenes = movie.scenes.filter(s => {
-    const items = typeKey === 'costumes' ? s.costumes : s.props;
+    const items = (typeKey === 'costumes' ? s.costumes : s.props) || [];
     return items.some(i => i.name === itemName) && s.date;
   });
   if(scenes.length === 0) return null;
@@ -795,8 +812,8 @@ function renderInventory(movie, listContainer, typeKey) {
       return dateA.localeCompare(dateB);
     }
     if(currentSort === 'count-desc') {
-      const countA = movie.scenes.filter(s => (typeKey === 'costumes' ? s.costumes : s.props).some(i => i.name === a)).length;
-      const countB = movie.scenes.filter(s => (typeKey === 'costumes' ? s.costumes : s.props).some(i => i.name === b)).length;
+      const countA = movie.scenes.filter(s => ((typeKey === 'costumes' ? s.costumes : s.props) || []).some(i => i.name === a)).length;
+      const countB = movie.scenes.filter(s => ((typeKey === 'costumes' ? s.costumes : s.props) || []).some(i => i.name === b)).length;
       return countB - countA;
     }
     return 0;
@@ -804,14 +821,13 @@ function renderInventory(movie, listContainer, typeKey) {
 
   uniqueNames.forEach(name => {
     const matchingScenes = movie.scenes.filter(s => {
-      const items = typeKey === 'costumes' ? s.costumes : s.props;
+      const items = (typeKey === 'costumes' ? s.costumes : s.props) || [];
       return items.some(i => i.name === name);
     });
     
-    // 🌟 アイテム自体のステータスが揃っているか確認して色をつけます
     let itemStatuses = new Set();
     matchingScenes.forEach(s => {
-      const items = typeKey === 'costumes' ? s.costumes : s.props;
+      const items = (typeKey === 'costumes' ? s.costumes : s.props) || [];
       items.filter(i => i.name === name).forEach(i => itemStatuses.add(i.status));
     });
     let statusHtml = '';
@@ -830,7 +846,7 @@ function renderInventory(movie, listContainer, typeKey) {
     const content = document.createElement('div');
     content.className = 'accordion-content';
     
-    matchingScenes.sort((a, b) => Number(a.number) - Number(b.number)).forEach(scene => {
+    matchingScenes.sort((a, b) => a.number.localeCompare(b.number, undefined, {numeric: true, sensitivity: 'base'})).forEach(scene => {
       content.appendChild(createSceneCard(scene));
     });
     
@@ -857,13 +873,14 @@ function renderSearchResults() {
   const filterCos = document.getElementById('search-costume').value;
   const filterProp = document.getElementById('search-prop').value;
 
-  if(filterNum) displayScenes = displayScenes.filter(s => s.number === filterNum);
+  // 🌟 安全に確実に検索が引っかかるように直しました
+  if(filterNum) displayScenes = displayScenes.filter(s => String(s.number) === String(filterNum));
   if(filterLoc) displayScenes = displayScenes.filter(s => s.location === filterLoc);
   if(filterDate) displayScenes = displayScenes.filter(s => s.date === filterDate);
-  if(filterCos) displayScenes = displayScenes.filter(s => s.costumes.some(c => c.name === filterCos));
-  if(filterProp) displayScenes = displayScenes.filter(s => s.props.some(p => p.name === filterProp));
+  if(filterCos) displayScenes = displayScenes.filter(s => (s.costumes || []).some(c => c.name === filterCos));
+  if(filterProp) displayScenes = displayScenes.filter(s => (s.props || []).some(p => p.name === filterProp));
 
-  displayScenes.sort((a, b) => Number(a.number) - Number(b.number));
+  displayScenes.sort((a, b) => a.number.localeCompare(b.number, undefined, {numeric: true, sensitivity: 'base'}));
 
   displayScenes.forEach(scene => list.appendChild(createSceneCard(scene)));
   if(displayScenes.length === 0) list.innerHTML = '<p class="scene-info">条件に合うシーンが見つかりませんでした。</p>';
@@ -887,8 +904,8 @@ function renderMovie() {
     let displayScenes = [...movie.scenes];
 
     displayScenes.sort((a, b) => {
-      if(currentSort === 'num-asc') return Number(a.number) - Number(b.number);
-      if(currentSort === 'num-desc') return Number(b.number) - Number(a.number);
+      if(currentSort === 'num-asc') return a.number.localeCompare(b.number, undefined, {numeric: true, sensitivity: 'base'});
+      if(currentSort === 'num-desc') return b.number.localeCompare(a.number, undefined, {numeric: true, sensitivity: 'base'});
       if(currentSort === 'date-asc' || currentSort === 'date-desc') {
         if(!a.date && !b.date) return 0;
         if(!a.date) return 1;
@@ -902,7 +919,6 @@ function renderMovie() {
   }
 }
 
-// 🌟 シーンの「見るだけ（View）」の画面を作る魔法です
 function renderSceneViewDetail() {
   const movie = movies.find(m => m.id === currentMovieId);
   const scene = movie.scenes.find(s => s.id === currentSceneId);
@@ -917,8 +933,9 @@ function renderSceneViewDetail() {
 
   const cList = document.getElementById('view-scene-costumes');
   cList.innerHTML = '';
-  if(scene.costumes.length > 0) {
-    let html = `<strong style="color: #c2185b;">[衣装]</strong><br>`;
+  if(scene.costumes && scene.costumes.length > 0) {
+    // 🌟 黒文字に変更しました！
+    let html = `<strong style="color: var(--text-color);">[衣装]</strong><br>`;
     scene.costumes.forEach(c => {
       html += `<div style="padding: 8px; border-left: 2px solid #ccc; margin-bottom: 4px; background: rgba(0,0,0,0.02);">
         <span class="status-color status-${c.status}" style="padding:2px 4px; font-size:11px;">${c.status}</span> 
@@ -932,8 +949,9 @@ function renderSceneViewDetail() {
 
   const pList = document.getElementById('view-scene-props');
   pList.innerHTML = '';
-  if(scene.props.length > 0) {
-    let html = `<strong style="color: #1976d2;">[小道具]</strong><br>`;
+  if(scene.props && scene.props.length > 0) {
+    // 🌟 黒文字に変更しました！
+    let html = `<strong style="color: var(--text-color);">[小道具]</strong><br>`;
     scene.props.forEach(p => {
       html += `<div style="padding: 8px; border-left: 2px solid #ccc; margin-bottom: 4px; background: rgba(0,0,0,0.02);">
         <span class="status-color status-${p.status}" style="padding:2px 4px; font-size:11px;">${p.status}</span> 
@@ -946,7 +964,6 @@ function renderSceneViewDetail() {
   }
 }
 
-// 🌟 シーンの「編集（Edit）」の画面を作る魔法です
 function renderSceneEditDetail() {
   const movie = movies.find(m => m.id === currentMovieId);
   const scene = movie.scenes.find(s => s.id === currentSceneId);
@@ -959,11 +976,11 @@ function renderSceneEditDetail() {
 
   const cList = document.getElementById('edit-costume-list');
   cList.innerHTML = '';
-  scene.costumes.forEach(c => addCostumeInput('edit-costume-list', c));
+  (scene.costumes || []).forEach(c => addCostumeInput('edit-costume-list', c));
 
   const pList = document.getElementById('edit-prop-list');
   pList.innerHTML = '';
-  scene.props.forEach(p => addPropInput('edit-prop-list', p));
+  (scene.props || []).forEach(p => addPropInput('edit-prop-list', p));
 }
 
 function saveEditedScene() {
@@ -982,7 +999,6 @@ function saveEditedScene() {
   saveMovie(movie); 
   populateSearchFilters();
   
-  // 保存したあとは、閲覧モードに戻るようにしました！
   cancelSceneEdit();
   alert('シーンの変更を保存しました。');
 }
@@ -1004,8 +1020,6 @@ window.openSceneEdit = openSceneEdit;
 window.cancelSceneEdit = cancelSceneEdit;
 window.closeSceneDetail = closeSceneDetail;
 window.addMovie = addMovie;
-window.deleteMovie = deleteMovie;
-window.editMovieTitle = editMovieTitle;
 window.toggleParticipation = toggleParticipation;
 window.handleExcelUpload = handleExcelUpload;
 window.changeGlobalCalMonth = changeGlobalCalMonth;
