@@ -25,8 +25,8 @@
       </div>
     </div>
     <div class="header-right">
-      <button class="icon-btn hidden" id="header-search-btn" onclick="goSearch()">検索</button>
-      <button class="icon-btn" onclick="toggleDarkMode()" id="dark-mode-btn">🌙</button>
+      <button class="icon-btn hidden" id="header-search-btn" onclick="goSearch()">[検索]</button>
+      <button class="icon-btn" onclick="toggleDarkMode()" id="dark-mode-btn">[ダークモード]</button>
     </div>
   </div>
 
@@ -34,7 +34,8 @@
     <h3 class="section-title">登録済みの映画一覧</h3>
     <div id="movie-list"></div>
 
-    <div class="card card-no-click" style="margin-top: 24px;">
+    <!-- 🌟 editor-only を追加して、普段は隠れるようにしました -->
+    <div class="card card-no-click editor-only" style="margin-top: 24px;">
       <h3>新しい映画を登録</h3>
       <input type="text" id="new-movie-title" placeholder="映画のタイトルを手入力">
       <button onclick="addMovie()">[+] 追加する</button>
@@ -46,6 +47,11 @@
     <div class="card card-no-click" style="margin-top: 24px;">
       <h3 style="color: #1976d2;">参加中の撮影スケジュール</h3>
       <div id="global-calendar"></div>
+    </div>
+
+    <!-- 🌟 編集者モードへの切り替えボタンです -->
+    <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
+      <button id="editor-toggle-btn" class="secondary" style="width: auto; font-size: 13px; color: var(--muted-text); border: 1px solid var(--border-color);" onclick="toggleEditorMode()">[鍵] 編集者モードになる</button>
     </div>
   </div>
 
@@ -106,7 +112,8 @@
         
         <button class="secondary sticky-back-btn" onclick="goHome()">&lt; 映画一覧に戻る</button>
 
-        <div class="card card-no-click">
+        <!-- 🌟 editor-only を追加 -->
+        <div class="card card-no-click editor-only">
           <h3>新しいシーンを追加</h3>
           <input type="number" id="new-scene-number" placeholder="シーン番号 (必須)" oninput="checkSceneInput()">
           
@@ -139,7 +146,7 @@
           <button id="btn-view-prop" onclick="setViewMode('prop')">小道具一覧</button>
         </div>
 
-        <button id="bulk-delete-btn" class="danger hidden" onclick="deleteSelectedScenes()" style="margin-bottom: 16px; margin-top: 0;">[削除] 選択したシーンをすべて削除</button>
+        <button id="bulk-delete-btn" class="danger hidden editor-only" onclick="deleteSelectedScenes()" style="margin-bottom: 16px; margin-top: 0;">[削除] 選択したシーンをすべて削除</button>
 
         <div id="scene-list"></div>
         <button class="secondary" onclick="goHome()">&lt; 映画一覧に戻る</button>
@@ -155,7 +162,8 @@
             <div id="view-scene-costumes" style="margin-bottom: 12px;"></div>
             <div id="view-scene-props"></div>
           </div>
-          <button onclick="openSceneEdit()">[編集] このシーンを編集する</button>
+          <!-- 🌟 editor-only を追加 -->
+          <button class="editor-only" onclick="openSceneEdit()">[編集] このシーンを編集する</button>
         </div>
 
         <div id="detail-pane-edit" class="hidden">

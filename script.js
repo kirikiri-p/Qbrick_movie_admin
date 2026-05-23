@@ -21,10 +21,13 @@ let currentSceneId = null;
 let currentViewMode = 'list'; 
 let currentSort = 'num-asc'; 
 let selectedSceneIds = new Set(); 
-let lastViewBeforeDetail = null; // 🌟 どこから詳細を開いたかを覚えておく魔法です
+let lastViewBeforeDetail = null; 
 
 let globalCalYear = new Date().getFullYear();
 let globalCalMonth = new Date().getMonth();
+
+// 🌟 編集モードの状態を覚えておく変数です（最初は閲覧モードです）
+let isEditorMode = false;
 
 function migrateSceneData(scene) {
   if (!scene.costumes) {
@@ -82,6 +85,35 @@ onSnapshot(moviesRef, (snapshot) => {
   }
 });
 
+// 🌟 編集者モードを切り替える魔法です
+function toggleEditorMode() {
+  if (isEditorMode) {
+    // 閲覧モードに戻ります
+    isEditorMode = false;
+    document.body.classList.remove('editor-mode');
+    document.getElementById('editor-toggle-btn').textContent = '[鍵] 編集者モードになる';
+    
+    selectedSceneIds.clear();
+    const bulkBtn = document.getElementById('bulk-delete-btn');
+    if(bulkBtn) bulkBtn.classList.add('hidden');
+    
+    alert('閲覧モードに戻りました。');
+  } else {
+    // パスワードを確認して編集者モードに入ります
+    const pass = prompt('編集者用パスワードを入力してください');
+    if (pass === 'きゅーぶりっく') {
+      isEditorMode = true;
+      document.body.classList.add('editor-mode');
+      document.getElementById('editor-toggle-btn').textContent = '[鍵] 閲覧モードに戻る';
+      alert('編集者モードに切り替わりました。');
+    } else if (pass !== null) {
+      alert('パスワードが違います……。');
+    }
+  }
+  renderHome();
+  if (currentMovieId) renderMovie();
+}
+
 async function saveMovie(movie) {
   await setDoc(doc(db, "movies", movie.id.toString()), movie);
 }
@@ -118,7 +150,6 @@ async function deleteMovieFromDetails() {
 
 function getParticipation(movieId) { return localStorage.getItem('part_' + movieId) === 'true'; }
 
-// 🌟 参加ボタンが確実に押せるように直しました
 function toggleParticipation(movieId) {
   const current = getParticipation(movieId);
   localStorage.setItem('part_' + movieId, current ? 'false' : 'true');
@@ -234,7 +265,7 @@ function goHome() {
 
 function goMovie(movieId) { 
   currentMovieId = movieId; 
-  closeSceneDetail(true); // 強制的に閉じる
+  closeSceneDetail(true); 
   selectedSceneIds.clear();
   document.getElementById('bulk-delete-btn').classList.add('hidden');
 
@@ -262,7 +293,6 @@ function backFromSearch() {
 }
 
 function goScene(sceneId, forceMovieId = null) { 
-  // 🌟 現在どの画面から飛んできたかを記憶します
   const currentVisibleView = ['view-home', 'view-movie', 'view-daily', 'view-search', 'view-movie-details'].find(id => !document.getElementById(id).classList.contains('hidden'));
   if (currentVisibleView && currentVisibleView !== 'view-movie') {
     lastViewBeforeDetail = currentVisibleView;
@@ -285,7 +315,7 @@ function goScene(sceneId, forceMovieId = null) {
   detailPane.classList.add('show-detail');
   listPane.classList.add('hide-on-mobile'); 
   
-  showView('view-movie'); // 詳細ペインを開くためにベースは view-movie にします
+  showView('view-movie'); 
   renderMovie();
   
   if(window.innerWidth < 800) window.scrollTo(0, 0); 
@@ -302,7 +332,6 @@ function cancelSceneEdit() {
   document.getElementById('detail-pane-view').classList.remove('hidden');
 }
 
-// 🌟 閉じた時に、元の画面に戻れるようにしました！
 function closeSceneDetail(forceReset = false) {
   document.getElementById('detail-pane').classList.remove('show-detail');
   document.getElementById('list-pane').classList.remove('hide-on-mobile');
@@ -495,15 +524,17 @@ function renderHome() {
     if(movie.director) detailText += ` ｜ 監督: ${movie.director}`;
     if(movie.year) detailText += ` ｜ ${movie.year}年`;
 
+    // 🌟 編集者モードの時だけ [編集] ボタンを作ります
+    let editBtnHtml = isEditorMode ? `<button class="edit-title-btn" onclick="event.stopPropagation(); goMovieDetails(${movie.id})">[編集]</button>` : '';
+
     div.innerHTML = `
       <div class="movie-info" onclick="goMovie(${movie.id})">
         <strong>${movie.type ? `[${movie.type}] ` : ''}${movie.title}</strong>
         <div class="scene-info" style="margin-left: 12px; margin-top: 0;">${detailText}</div>
       </div>
       <div class="movie-actions">
-        <!-- 🌟 ボタンが確実に押せるように直しました！ -->
         <button class="participation-toggle ${toggleClass}" onclick="event.stopPropagation(); toggleParticipation(${movie.id})">${toggleText}</button>
-        <button class="edit-title-btn" onclick="event.stopPropagation(); goMovieDetails(${movie.id})">[編集]</button>
+        ${editBtnHtml}
       </div>
     `;
     list.appendChild(div);
@@ -621,7 +652,7 @@ function toggleSceneSelection(sceneId, checkbox, event) {
   else selectedSceneIds.delete(sceneId);
   
   const btn = document.getElementById('bulk-delete-btn');
-  if(selectedSceneIds.size > 0) btn.classList.remove('hidden');
+  if(selectedSceneIds.size > 0 && isEditorMode) btn.classList.remove('hidden');
   else btn.classList.add('hidden');
   
   const card = checkbox.closest('.card');
@@ -662,7 +693,6 @@ function getUniqueProperties(movie, propName) {
     if(s[propName]) items.add(s[propName]);
   });
   let arr = Array.from(items).filter(x => x);
-  // 🌟 自然な順番で並ぶようにしました！（例：1, 2, 13, 15...）
   if (propName === 'number') {
     arr.sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
   } else {
@@ -717,7 +747,6 @@ function updateDataLists() {
   getUniqueItemNames(movie, 'props').forEach(i => pList.appendChild(new Option(i)));
 }
 
-// 🌟 エラーで止まらないように安全な書き方に直しました
 function setViewMode(mode) {
   currentViewMode = mode;
   ['list', 'cos', 'prop'].forEach(id => {
@@ -735,7 +764,7 @@ function setViewMode(mode) {
     currentSort = 'num-asc';
     sortSel.value = 'num-asc';
   } else {
-    sortSel.add(new Option('使用シーンが多い順', 'count-desc')); // デフォルトをこれにしました
+    sortSel.add(new Option('使用シーンが多い順', 'count-desc')); 
     sortSel.add(new Option('名前順', 'name-asc'));
     sortSel.add(new Option('最速使用日が早い順', 'date-asc'));
     currentSort = 'count-desc';
@@ -758,7 +787,8 @@ function createSceneCard(scene, forceMovieId = null) {
 
   let html = `<div class="scene-card-header">`;
   
-  if(!forceMovieId) {
+  // 🌟 編集者モードの時だけチェックボックスを出します
+  if(!forceMovieId && isEditorMode) {
     html += `<input type="checkbox" class="scene-checkbox" ${selectedSceneIds.has(scene.id)?'checked':''} onclick="toggleSceneSelection(${scene.id}, this, event)">`;
   }
   
@@ -873,7 +903,6 @@ function renderSearchResults() {
   const filterCos = document.getElementById('search-costume').value;
   const filterProp = document.getElementById('search-prop').value;
 
-  // 🌟 安全に確実に検索が引っかかるように直しました
   if(filterNum) displayScenes = displayScenes.filter(s => String(s.number) === String(filterNum));
   if(filterLoc) displayScenes = displayScenes.filter(s => s.location === filterLoc);
   if(filterDate) displayScenes = displayScenes.filter(s => s.date === filterDate);
@@ -934,14 +963,13 @@ function renderSceneViewDetail() {
   const cList = document.getElementById('view-scene-costumes');
   cList.innerHTML = '';
   if(scene.costumes && scene.costumes.length > 0) {
-    // 🌟 黒文字に変更しました！
-    let html = `<strong style="color: var(--text-color);">[衣装]</strong><br>`;
+    let html = `<strong>[衣装]</strong><br>`;
     scene.costumes.forEach(c => {
-      html += `<div style="padding: 8px; border-left: 2px solid #ccc; margin-bottom: 4px; background: rgba(0,0,0,0.02);">
+      html += `<div style="padding: 8px; border-left: 2px solid var(--border-color); margin-bottom: 4px; background: rgba(0,0,0,0.02);">
         <span class="status-color status-${c.status}" style="padding:2px 4px; font-size:11px;">${c.status}</span> 
         <strong>${c.name}</strong>
         ${c.desc ? `<div class="scene-info" style="margin-top: 2px;">${c.desc}</div>` : ''}
-        ${c.price ? `<div class="scene-info" style="color:#888;">${c.price}</div>` : ''}
+        ${c.price ? `<div class="scene-info" style="color:var(--muted-text);">${c.price}</div>` : ''}
       </div>`;
     });
     cList.innerHTML = html;
@@ -950,14 +978,13 @@ function renderSceneViewDetail() {
   const pList = document.getElementById('view-scene-props');
   pList.innerHTML = '';
   if(scene.props && scene.props.length > 0) {
-    // 🌟 黒文字に変更しました！
-    let html = `<strong style="color: var(--text-color);">[小道具]</strong><br>`;
+    let html = `<strong>[小道具]</strong><br>`;
     scene.props.forEach(p => {
-      html += `<div style="padding: 8px; border-left: 2px solid #ccc; margin-bottom: 4px; background: rgba(0,0,0,0.02);">
+      html += `<div style="padding: 8px; border-left: 2px solid var(--border-color); margin-bottom: 4px; background: rgba(0,0,0,0.02);">
         <span class="status-color status-${p.status}" style="padding:2px 4px; font-size:11px;">${p.status}</span> 
         <strong>${p.name}</strong>
         ${p.desc ? `<div class="scene-info" style="margin-top: 2px;">${p.desc}</div>` : ''}
-        ${p.price ? `<div class="scene-info" style="color:#888;">${p.price}</div>` : ''}
+        ${p.price ? `<div class="scene-info" style="color:var(--muted-text);">${p.price}</div>` : ''}
       </div>`;
     });
     pList.innerHTML = html;
@@ -1003,6 +1030,7 @@ function saveEditedScene() {
   alert('シーンの変更を保存しました。');
 }
 
+window.toggleEditorMode = toggleEditorMode;
 window.toggleDarkMode = toggleDarkMode;
 window.updateDays = updateDays;
 window.checkSceneInput = checkSceneInput;
@@ -1020,6 +1048,8 @@ window.openSceneEdit = openSceneEdit;
 window.cancelSceneEdit = cancelSceneEdit;
 window.closeSceneDetail = closeSceneDetail;
 window.addMovie = addMovie;
+window.deleteMovie = deleteMovie;
+window.editMovieTitle = editMovieTitle;
 window.toggleParticipation = toggleParticipation;
 window.handleExcelUpload = handleExcelUpload;
 window.changeGlobalCalMonth = changeGlobalCalMonth;

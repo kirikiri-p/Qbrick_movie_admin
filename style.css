@@ -22,6 +22,9 @@ body.dark-mode {
 
 body { font-family: "Helvetica Neue", Arial, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; transition: background-color 0.2s; line-height: 1.6;}
 
+/* 🌟 編集者モードでない時は、editor-only を隠す魔法です */
+body:not(.editor-mode) .editor-only { display: none !important; }
+
 .header { background-color: var(--header-bg); color: #fdfdfd; padding: 12px 20px; font-weight: bold; position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--accent-color);}
 .header-left { display: flex; align-items: center; }
 .header-right { display: flex; align-items: center; gap: 8px; }
@@ -45,7 +48,6 @@ body { font-family: "Helvetica Neue", Arial, sans-serif; background-color: var(-
 .participation-toggle.active { background-color: #e3f2fd; color: #1565c0; border-color: #1565c0; }
 body.dark-mode .participation-toggle.active { background-color: #0d3b75; color: #bbdefb; border-color: #bbdefb;}
 
-/* 🌟 ライトモードでも文字をくっきりさせる魔法です */
 input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 8px 10px; margin: 8px 0; border: 1px solid var(--border-color); box-sizing: border-box; font-size: 14px; background-color: var(--input-bg); color: var(--text-color) !important; opacity: 1;}
 input[type="file"] { margin: 8px 0; color: var(--text-color); font-size: 13px;}
 
