@@ -318,16 +318,16 @@ window.toggleEditorMode = function() {
     selectedSceneIds.clear();
     const bulkBtn = document.getElementById('bulk-delete-btn');
     if(bulkBtn) bulkBtn.classList.add('hidden');
-    alert('閲覧モードに戻りました。');
+    alert('閲覧モードに戻りました');
   } else {
     const pass = prompt('編集者用パスワードを入力してください');
     if (pass === 'きゅーぶりっく') {
       isEditorMode = true;
       document.body.classList.add('editor-mode');
       document.getElementById('editor-toggle-btn').textContent = '閲覧モードに戻る';
-      alert('編集者モードに切り替わりました。');
+      alert('編集者モードに切り替わりました');
     } else if (pass !== null) {
-      alert('パスワードが違います……。');
+      alert('パスワードが違います');
     }
   }
   renderHome();
@@ -343,7 +343,7 @@ window.saveMovieDetails = function() {
   movie.type = document.getElementById('movie-detail-type').value;
   movie.director = document.getElementById('movie-detail-director').value.trim();
   movie.year = document.getElementById('movie-detail-year').value.trim();
-  if(!movie.title) { alert('タイトルは必須です。'); return; }
+  if(!movie.title) { alert('タイトルは必須です'); return; }
   saveMovie(movie);
   window.goHome();
 };
@@ -470,7 +470,7 @@ window.handleExcelUpload = function(event) {
     const newMovie = { id: Date.now(), title: movieTitle, scenes: newScenes, type: '', director: '', year: '', icon: '🎬' };
     saveMovie(newMovie); 
     document.getElementById('excel-upload').value = '';
-    alert(movieTitle + ' のデータを読み込みました。');
+    alert(movieTitle + ' のデータを読み込みました');
   };
   reader.readAsArrayBuffer(file);
 };
@@ -593,7 +593,7 @@ function renderHome() {
   const list = document.getElementById('movie-list');
   list.innerHTML = '';
   if(movies.length === 0) {
-    list.innerHTML = '<p class="scene-info">まだ登録された映画がありません。</p>';
+    list.innerHTML = '<p class="scene-info">まだ登録された映画がありません</p>';
     return;
   }
   movies.forEach(movie => {
@@ -961,7 +961,7 @@ function renderInventory(movie, listContainer, typeKey) {
   let uniqueNames = getUniqueItemNames(movie, typeKey);
   
   if(uniqueNames.length === 0) {
-    listContainer.innerHTML = '<p class="scene-info">まだ登録されていません。</p>';
+    listContainer.innerHTML = '<p class="scene-info">まだ登録されていません</p>';
     return;
   }
 
@@ -1031,7 +1031,7 @@ window.renderSearchResults = function() {
   list.innerHTML = '';
 
   if(!movie || movie.scenes.length === 0) {
-    list.innerHTML = '<p class="scene-info">まだシーンがありません。</p>';
+    list.innerHTML = '<p class="scene-info">まだシーンがありません</p>';
     return;
   }
 
@@ -1058,7 +1058,7 @@ window.renderSearchResults = function() {
   displayScenes.sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, {numeric: true, sensitivity: 'base'}));
 
   displayScenes.forEach(scene => list.appendChild(createSceneCard(scene)));
-  if(displayScenes.length === 0) list.innerHTML = '<p class="scene-info">条件に合うシーンが見つかりませんでした。</p>';
+  if(displayScenes.length === 0) list.innerHTML = '<p class="scene-info">条件に合うシーンが見つかりませんでした</p>';
 };
 
 function renderMovie() {
@@ -1071,7 +1071,7 @@ function renderMovie() {
   list.innerHTML = '';
 
   if(!movie || movie.scenes.length === 0) {
-    list.innerHTML = '<p class="scene-info">まだシーンがありません。</p>';
+    list.innerHTML = '<p class="scene-info">まだシーンがありません</p>';
     list.style.minHeight = '';
     return;
   }
@@ -1206,5 +1206,5 @@ window.saveEditedScene = function() {
   renderedDailyDate = null;
   
   window.cancelSceneEdit();
-  alert('シーンの変更を保存しました。');
+  alert('シーンの変更を保存しました');
 };
