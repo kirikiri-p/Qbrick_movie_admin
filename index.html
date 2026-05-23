@@ -10,10 +10,9 @@
 <body>
 
 <div id="app">
-  <!-- 🌟 ロゴとクリックできるパンくずリストを追加しました -->
   <div class="header">
     <div class="header-left">
-      <img src="Qbrick_icon.png" class="header-logo" alt="ロゴ">
+      <img src="image_441203.png" class="header-logo" alt="ロゴ">
       <div>
         <div class="breadcrumb">
           <span class="breadcrumb-link" onclick="goHome()">ホーム ＞ 製作映画一覧</span>
@@ -28,23 +27,29 @@
   <!-- ① ホーム：製作映画一覧 ＆ 全体カレンダー -->
   <div id="view-home" class="container">
     
-    <!-- 📅 参加映画の全体カレンダー -->
-    <div class="card card-no-click" style="margin-bottom: 24px;">
-      <h3 style="color: #1976d2;">📅 参加中の撮影スケジュール</h3>
-      <div id="global-calendar"></div>
-    </div>
+    <!-- 1. 登録済みの映画（参加・不参加を切り替える場所です） -->
+    <h3 style="margin-top: 0;">🎬 登録済みの映画一覧</h3>
+    <div id="movie-list"></div>
 
-    <div class="card card-no-click">
-      <h3>🎬 新しい映画を登録</h3>
+    <!-- 2. 新しい映画の登録 -->
+    <div class="card card-no-click" style="margin-top: 24px;">
+      <h3>➕ 新しい映画を登録</h3>
       <input type="text" id="new-movie-title" placeholder="映画のタイトルを手入力">
       <button onclick="addMovie()">手入力で登録する</button>
       
       <h4 style="margin-top: 24px; color:#c2185b;">📁 Excelから読み込む</h4>
       <input type="file" id="excel-upload" accept=".xlsx, .xls" onchange="handleExcelUpload(event)">
     </div>
+
+    <!-- 3. 参加映画の全体カレンダー -->
+    <div class="card card-no-click" style="margin-top: 24px;">
+      <h3 style="color: #1976d2;">📅 参加中の撮影スケジュール</h3>
+      <div id="global-calendar"></div>
+      
+      <!-- 日付をクリックした時に、ここにシーンの一覧がふわりと出ます -->
+      <div id="daily-scene-list" style="margin-top: 16px;"></div>
+    </div>
     
-    <h3 style="margin-top: 24px;">登録済みの映画（参加・非参加）</h3>
-    <div id="movie-list"></div>
   </div>
 
   <!-- ② 映画詳細（シーン一覧 ＆ 逆引き一覧） -->
@@ -53,7 +58,6 @@
       <!-- 左側：シーン一覧 -->
       <div class="list-pane" id="list-pane">
         
-        <!-- いつでも戻れるボタンを一番上にも置きました -->
         <button class="secondary sticky-back-btn" onclick="goHome()">◀ 映画一覧に戻る</button>
 
         <div class="card card-no-click">
@@ -78,7 +82,6 @@
         <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 32px; margin-bottom: 8px; border-bottom: 2px solid var(--header-bg); padding-bottom: 4px;">
           <h3 style="border: none; margin: 0; padding: 0;">登録データの一覧</h3>
           
-          <!-- 🔍 並べ替え・絞り込みのメニューです -->
           <div class="sort-filter-bar" id="sort-filter-bar">
             <select id="filter-select" onchange="updateFilter(this.value)">
               <option value="all">すべて表示</option>
@@ -171,6 +174,7 @@
     </div>
   </div>
 </div>
+
 <script type="module" src="script.js"></script>
 </body>
 </html>

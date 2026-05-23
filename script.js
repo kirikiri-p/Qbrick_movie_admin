@@ -1,8 +1,6 @@
-// 🔥 Firebaseの魔法の杖（CDN）を借りてきます
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// プロデューサーさんが持ってきてくれた「魔法の鍵」です……！
 const firebaseConfig = {
   apiKey: "AIzaSyAHgLjOMvSN88rLlLwNDrv4JQBGE-Bg6Ik",
   authDomain: "qbrick-movie-admin.firebaseapp.com",
@@ -13,7 +11,6 @@ const firebaseConfig = {
   measurementId: "G-ZY07VHWJGG"
 };
 
-// Firebaseの保管庫と繋ぎます……！
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const moviesRef = collection(db, "movies");
@@ -28,14 +25,12 @@ let currentFilter = 'all';
 let globalCalYear = new Date().getFullYear();
 let globalCalMonth = new Date().getMonth();
 
-// 📡 誰かがデータを変更したら、自動でみんなの画面を更新する魔法です
 onSnapshot(moviesRef, (snapshot) => {
   movies = [];
   snapshot.forEach((doc) => {
     movies.push(doc.data());
   });
   
-  // 今開いている画面に合わせて再描画します
   if (currentMovieId) {
     if (!movies.find(m => m.id === currentMovieId)) {
       goHome();
@@ -49,9 +44,19 @@ onSnapshot(moviesRef, (snapshot) => {
   }
 });
 
-// ☁️ 保管庫（Firestore）にデータを預ける魔法です
 async function saveMovie(movie) {
   await setDoc(doc(db, "movies", movie.id.toString()), movie);
+}
+
+// 👤 個人のブラウザに参加情報を記憶する魔法です
+function getParticipation(movieId) {
+  return localStorage.getItem('part_' + movieId) === 'true'; // 初期設定は「不参加（false）」です
+}
+function toggleParticipation(movieId, event) {
+  event.stopPropagation(); 
+  const current = getParticipation(movieId);
+  localStorage.setItem('part_' + movieId, current ? 'false' : 'true');
+  renderHome(); // Firebaseには送らず、自分の画面だけ更新します
 }
 
 let isDarkMode = false;
@@ -147,6 +152,7 @@ function scrollToTop() {
 
 function goHome() { 
   currentMovieId = null;
+  document.getElementById('daily-scene-list').innerHTML = ''; // カレンダーの下を綺麗にします
   renderHome(); 
   document.getElementById('header-movie-title-nav').classList.add('hidden');
   document.getElementById('header-main-title').textContent = '製作映画一覧';
@@ -199,18 +205,10 @@ function addMovie() {
   const titleInput = document.getElementById('new-movie-title');
   const title = titleInput.value.trim();
   if (!title) return;
-  const newMovie = { id: Date.now(), title: title, scenes: [], isParticipating: true };
-  saveMovie(newMovie); // 保管庫に保存します
+  // 参加状況（isParticipating）はFirebaseに送らないように外しました……！
+  const newMovie = { id: Date.now(), title: title, scenes: [] };
+  saveMovie(newMovie); 
   titleInput.value = '';
-}
-
-function toggleParticipation(movieId, event) {
-  event.stopPropagation(); 
-  const movie = movies.find(m => m.id === movieId);
-  if(movie) {
-    movie.isParticipating = !movie.isParticipating;
-    saveMovie(movie); // 保管庫に保存します
-  }
 }
 
 function handleExcelUpload(event) {
@@ -240,8 +238,8 @@ function handleExcelUpload(event) {
     });
 
     const movieTitle = file.name.replace(/\.[^/.]+$/, "");
-    const newMovie = { id: Date.now(), title: movieTitle, scenes: newScenes, isParticipating: true };
-    saveMovie(newMovie); // 保管庫に保存します
+    const newMovie = { id: Date.now(), title: movieTitle, scenes: newScenes };
+    saveMovie(newMovie); 
     document.getElementById('excel-upload').value = '';
     alert(movieTitle + ' のデータを読み込みました……！');
   };
@@ -271,9 +269,12 @@ function renderGlobalCalendar() {
   let tr = document.createElement('tr');
   for(let i = 0; i < firstDay; i++) tr.appendChild(document.createElement('td'));
   
+  // 👤 個人のブラウザで「参加中」になっている映画のシーンだけを集めます
   let activeScenes = [];
-  movies.filter(m => m.isParticipating).forEach(m => {
-    m.scenes.forEach(s => activeScenes.push({ movie: m, scene: s }));
+  movies.forEach(m => {
+    if(getParticipation(m.id)) {
+      m.scenes.forEach(s => activeScenes.push({ movie: m, scene: s }));
+    }
   });
 
   for(let day = 1; day <= daysInMonth; day++) {
@@ -284,13 +285,21 @@ function renderGlobalCalendar() {
     const dateStr = `${globalCalYear}-${('0'+(globalCalMonth+1)).slice(-2)}-${('0'+day).slice(-2)}`;
     const dayScenes = activeScenes.filter(item => item.scene.date === dateStr || item.scene.date === dateStr.replace(/-0/g, '-')); 
     
-    dayScenes.forEach(item => {
-      const marker = document.createElement('span');
-      marker.className = 'cal-marker';
-      marker.innerHTML = `⭕ [${item.movie.title}] シーン${item.scene.number}`;
-      marker.onclick = () => goScene(item.scene.id, item.movie.id);
-      td.appendChild(marker);
-    });
+    // その日に予定があれば、マス全体をクリックできるようにします
+    if(dayScenes.length > 0) {
+      td.style.cursor = 'pointer';
+      td.style.backgroundColor = 'rgba(25, 118, 210, 0.05)';
+      td.onclick = () => showDailyScenes(dateStr, dayScenes);
+      
+      dayScenes.forEach(item => {
+        const marker = document.createElement('span');
+        marker.className = 'cal-marker';
+        marker.innerHTML = `⭕ [${item.movie.title}] シーン${item.scene.number}`;
+        // マスの中の文字を押した時も、ちゃんとシーン詳細に飛ぶようにします
+        marker.onclick = (e) => { e.stopPropagation(); goScene(item.scene.id, item.movie.id); };
+        td.appendChild(marker);
+      });
+    }
     tr.appendChild(td);
   }
   while(tr.children.length < 7) tr.appendChild(document.createElement('td'));
@@ -298,10 +307,27 @@ function renderGlobalCalendar() {
   container.appendChild(table);
 }
 
+// 📅 カレンダーの日付をクリックした時に、リストを表示する魔法です
+function showDailyScenes(dateStr, dayScenes) {
+  const container = document.getElementById('daily-scene-list');
+  let html = `<h4 style="border-bottom: 2px solid #1976d2; padding-bottom: 4px; color: var(--text-color);">📅 ${dateStr} の撮影予定</h4>`;
+  
+  dayScenes.sort((a, b) => Number(a.scene.number) - Number(b.scene.number)).forEach(item => {
+    html += `
+      <div class="daily-scene-card" onclick="goScene(${item.scene.id}, ${item.movie.id})">
+        <strong style="color: #1976d2;">[${item.movie.title}] シーン ${item.scene.number}</strong><br>
+        <span class="scene-info">${item.scene.sceneName || '名称未設定'} ｜ ${item.scene.location || '場所未定'}</span>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
 function changeGlobalCalMonth(diff) {
   globalCalMonth += diff;
   if(globalCalMonth < 0) { globalCalMonth = 11; globalCalYear--; }
   if(globalCalMonth > 11) { globalCalMonth = 0; globalCalYear++; }
+  document.getElementById('daily-scene-list').innerHTML = ''; // 月を変えたらリストは閉じます
   renderHome();
 }
 
@@ -318,9 +344,10 @@ function renderHome() {
     const div = document.createElement('div');
     div.className = 'card movie-list-item';
     
-    const isPart = movie.isParticipating !== false; 
+    // ブラウザの記憶から状態を読み取ります
+    const isPart = getParticipation(movie.id); 
     const toggleClass = isPart ? 'active' : '';
-    const toggleText = isPart ? '✔ 参加中' : '非参加';
+    const toggleText = isPart ? '🟢 参加' : '⚪ 不参加';
 
     div.innerHTML = `
       <div class="movie-info" onclick="goMovie(${movie.id})">
@@ -355,7 +382,7 @@ function addScene() {
     propStatus: '未着手', propName: '', propDesc: '', propPrice: ''
   });
 
-  saveMovie(movie); // 保管庫に保存します
+  saveMovie(movie); 
   document.getElementById('scene-number').value = '';
   document.getElementById('scene-name').value = '';
   document.getElementById('scene-location').value = '';
@@ -367,7 +394,7 @@ function deleteScene() {
   if(confirm("本当にこのシーンを削除してもよろしいですか……？")) {
     const movie = movies.find(m => m.id === currentMovieId);
     movie.scenes = movie.scenes.filter(s => s.id !== currentSceneId);
-    saveMovie(movie); // 保管庫に保存します
+    saveMovie(movie); 
     closeSceneDetail(); 
   }
 }
@@ -572,7 +599,6 @@ function saveSceneDetail() {
   saveMovie(movie); 
 }
 
-// 🌐 HTMLから呼び出せるように、おまじない（type="module"）の外に公開します
 window.toggleDarkMode = toggleDarkMode;
 window.updateDays = updateDays;
 window.checkSceneInput = checkSceneInput;
@@ -586,6 +612,7 @@ window.addMovie = addMovie;
 window.toggleParticipation = toggleParticipation;
 window.handleExcelUpload = handleExcelUpload;
 window.changeGlobalCalMonth = changeGlobalCalMonth;
+window.showDailyScenes = showDailyScenes;
 window.addScene = addScene;
 window.deleteScene = deleteScene;
 window.setViewMode = setViewMode;
