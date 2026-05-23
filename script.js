@@ -91,7 +91,17 @@ window.goSearch = () => { window.location.hash = 'search/' + currentMovieId; };
 window.goMovieDetails = (id) => { window.location.hash = 'details/' + id; };
 window.goScene = (sId, forceMovieId) => { window.location.hash = `scene/${forceMovieId || currentMovieId}/${sId}`; };
 window.backFromSearch = () => { window.location.hash = `movie/${currentMovieId}`; };
-window.closeSceneDetail = () => { window.location.hash = lastViewHash || `movie/${currentMovieId}`; };
+
+// 🌟 スクロール位置を記憶して、一番上に戻らないようにする魔法です！
+window.closeSceneDetail = (forceReset = false) => { 
+  const scrollY = window.scrollY;
+  document.getElementById('detail-pane').classList.remove('show-detail');
+  document.getElementById('list-pane').classList.remove('hide-on-mobile');
+  currentSceneId = null;
+  window.location.hash = lastViewHash || `movie/${currentMovieId}`; 
+  setTimeout(() => window.scrollTo(0, scrollY), 10);
+};
+
 window.showDailyScenes = (dateStr) => { window.location.hash = `daily/${dateStr}`; };
 
 function executeGoHome(isDataUpdate) {
@@ -272,14 +282,16 @@ window.toggleParticipation = function(movieId) {
 };
 
 window.toggleDarkMode = function() {
+  const btn = document.getElementById('dark-mode-btn');
+  if(!btn) return;
   isDarkMode = !isDarkMode;
   const body = document.body;
   if(isDarkMode) {
     body.classList.add('dark-mode');
-    document.getElementById('dark-mode-btn').textContent = '☀️';
+    btn.textContent = '☀️';
   } else {
     body.classList.remove('dark-mode');
-    document.getElementById('dark-mode-btn').textContent = '🌙';
+    btn.textContent = '🌙';
   }
 };
 
@@ -307,13 +319,15 @@ window.updateSelectColor = function(sel) {
   sel.classList.add('status-' + sel.value);
 };
 
+// 🌟 出力された文字列の日付も読み込めるように進化させました！
 function parseExcelDate(serial) {
+  if (!serial) return '';
   if (typeof serial === 'number') {
     const utc_days = Math.floor(serial - 25569);
     const date_info = new Date(utc_days * 86400 * 1000);
     return date_info.getUTCFullYear() + '-' + ('0' + (date_info.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + date_info.getUTCDate()).slice(-2);
   }
-  return serial || '';
+  return String(serial);
 }
 
 window.scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
@@ -338,6 +352,7 @@ window.addMovie = function() {
   titleInput.value = '';
 };
 
+// 🌟 Excelの読み込みと出力を完全に同じ形にしました！
 window.handleExcelUpload = function(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -354,22 +369,34 @@ window.handleExcelUpload = function(event) {
     rows.forEach((row, index) => {
       if (!row || row.length === 0) return;
       const number = String(row[0] || '');
-      const date = parseExcelDate(row[1]);
+      const rawDate = parseExcelDate(row[1]);
+      const dates = rawDate ? rawDate.split(',').map(d=>d.trim()).filter(d=>d) : [];
       const sceneName = String(row[2] || '');
       const location = String(row[3] || '');
       
-      const costumes = row[5] ? row[5].split(',').map((n,i)=>({id:'c'+Date.now()+i+Math.random(), name:n.trim(), status:row[4]||'未着手', desc:row[6]||'', price:row[7]||''})) : [];
-      const props = row[9] ? row[9].split(',').map((n,i)=>({id:'p'+Date.now()+i+Math.random(), name:n.trim(), status:row[8]||'未着手', desc:row[10]||'', price:row[11]||''})) : [];
+      const cStats = row[4] ? String(row[4]).split(',') : [];
+      const cNames = row[5] ? String(row[5]).split(',') : [];
+      const cDescs = row[6] ? String(row[6]).split(',') : [];
+      const cPrices = row[7] ? String(row[7]).split(',') : [];
+      const costumes = cNames.map((n, i) => ({
+        id: 'c'+Date.now()+i+Math.random(), name: n.trim(), status: (cStats[i] || '未着手').trim(), desc: (cDescs[i] || '').trim(), price: (cPrices[i] || '').trim()
+      })).filter(c => c.name);
+
+      const pStats = row[8] ? String(row[8]).split(',') : [];
+      const pNames = row[9] ? String(row[9]).split(',') : [];
+      const pDescs = row[10] ? String(row[10]).split(',') : [];
+      const pPrices = row[11] ? String(row[11]).split(',') : [];
+      const props = pNames.map((n, i) => ({
+        id: 'p'+Date.now()+i+Math.random(), name: n.trim(), status: (pStats[i] || '未着手').trim(), desc: (pDescs[i] || '').trim(), price: (pPrices[i] || '').trim()
+      })).filter(p => p.name);
 
       const existing = newScenes.find(s => s.number === number && s.sceneName === sceneName && s.location === location);
       if (existing) {
         if(costumes.length > 0) existing.costumes.push(...costumes);
         if(props.length > 0) existing.props.push(...props);
-        if(date && !existing.dates.includes(date)) existing.dates.push(date);
+        dates.forEach(d => { if(!existing.dates.includes(d)) existing.dates.push(d); });
       } else {
-        newScenes.push({
-          id: Date.now() + index, number: number, dates: date ? [date] : [], sceneName: sceneName, location: location, costumes: costumes, props: props
-        });
+        newScenes.push({ id: Date.now() + index, number: number, dates: dates, sceneName: sceneName, location: location, costumes: costumes, props: props });
       }
     });
 
@@ -388,16 +415,15 @@ window.exportToExcel = function() {
   const aoa = [['シーン番号', '撮影日', 'シーン名', '場所', '衣装ステータス', '衣装名', '衣装詳細', '金額/メモ', '小道具ステータス', '物品名', '小道具詳細', '金額/メモ']];
   
   movie.scenes.forEach(s => {
-    const dateStr = s.dates ? s.dates.join(', ') : '';
-    const cStats = (s.costumes||[]).map(c=>c.status).join(', ');
-    const cNames = (s.costumes||[]).map(c=>c.name).join(', ');
-    const cDescs = (s.costumes||[]).map(c=>c.desc).join(', ');
-    const cPrices = (s.costumes||[]).map(c=>c.price).join(', ');
-    
-    const pStats = (s.props||[]).map(p=>p.status).join(', ');
-    const pNames = (s.props||[]).map(p=>p.name).join(', ');
-    const pDescs = (s.props||[]).map(p=>p.desc).join(', ');
-    const pPrices = (s.props||[]).map(p=>p.price).join(', ');
+    const dateStr = s.dates ? s.dates.join(',') : '';
+    const cStats = (s.costumes||[]).map(c=>c.status).join(',');
+    const cNames = (s.costumes||[]).map(c=>c.name).join(',');
+    const cDescs = (s.costumes||[]).map(c=>c.desc).join(',');
+    const cPrices = (s.costumes||[]).map(c=>c.price).join(',');
+    const pStats = (s.props||[]).map(p=>p.status).join(',');
+    const pNames = (s.props||[]).map(p=>p.name).join(',');
+    const pDescs = (s.props||[]).map(p=>p.desc).join(',');
+    const pPrices = (s.props||[]).map(p=>p.price).join(',');
 
     aoa.push([s.number, dateStr, s.sceneName, s.location, cStats, cNames, cDescs, cPrices, pStats, pNames, pDescs, pPrices]);
   });
@@ -410,17 +436,12 @@ window.exportToExcel = function() {
 function getSceneOverallStatus(scene) {
   const items = [...(scene.costumes || []), ...(scene.props || [])];
   if(items.length === 0) return 'none'; 
-  
-  let hasAlert = false;
-  let allUsed = true;
-  let allReadyOrUsed = true;
-
+  let hasAlert = false, allUsed = true, allReadyOrUsed = true;
   items.forEach(i => {
     if(i.status === '未着手' || i.status === '準備中') hasAlert = true;
     if(i.status !== '使用済み') allUsed = false;
     if(i.status !== '準備完了' && i.status !== '使用済み') allReadyOrUsed = false;
   });
-
   if(hasAlert) return 'alert';       
   if(allUsed) return 'used';         
   if(allReadyOrUsed) return 'ready'; 
@@ -451,15 +472,12 @@ function renderGlobalCalendar() {
   
   let activeScenes = [];
   movies.forEach(m => {
-    if(getParticipation(m.id)) {
-      m.scenes.forEach(s => activeScenes.push({ movie: m, scene: s }));
-    }
+    if(getParticipation(m.id)) m.scenes.forEach(s => activeScenes.push({ movie: m, scene: s }));
   });
 
   for(let day = 1; day <= daysInMonth; day++) {
     if(tr.children.length === 7) { table.appendChild(tr); tr = document.createElement('tr'); }
     const td = document.createElement('td');
-    td.innerHTML = `<span class="cal-day-num">${day}</span>`;
     
     const dateStr = `${globalCalYear}-${('0'+(globalCalMonth+1)).slice(-2)}-${('0'+day).slice(-2)}`;
     const dayScenes = activeScenes.filter(item => item.scene.dates && (item.scene.dates.includes(dateStr) || item.scene.dates.includes(dateStr.replace(/-0/g, '-')))); 
@@ -469,24 +487,28 @@ function renderGlobalCalendar() {
       td.style.backgroundColor = 'rgba(25, 118, 210, 0.05)';
       td.onclick = () => window.showDailyScenes(dateStr);
       
+      // 🌟 日付と映画アイコンを並べます
+      const icons = new Set();
+      dayScenes.forEach(item => icons.add(item.movie.icon || '🎬'));
+      
+      td.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="cal-day-num">${day}</span>
+        <span style="font-size:12px;">${Array.from(icons).join('')}</span>
+      </div>`;
+      
+      // 🌟 その下にステータスの丸を並べます
       const dotContainer = document.createElement('div');
-      dotContainer.className = 'cal-dot-container';
+      dotContainer.style = 'display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-start; margin-top:4px;';
 
       dayScenes.forEach(item => {
         const overall = getSceneOverallStatus(item.scene);
-        const icon = item.movie.icon || '🎬';
-        
-        const marker = document.createElement('span');
-        marker.className = `cal-marker`; 
-        marker.innerHTML = `${icon} S${item.scene.number} <span class="cal-status-dot cal-status-${overall}">〇</span>`;
-        marker.onclick = (e) => { e.stopPropagation(); window.goScene(item.scene.id, item.movie.id); };
-        td.appendChild(marker);
-
         const dot = document.createElement('span');
-        dot.className = `cal-dot cal-dot-${overall}`;
+        dot.className = `cal-status-circle cal-bg-${overall}`;
         dotContainer.appendChild(dot);
       });
       td.appendChild(dotContainer);
+    } else {
+      td.innerHTML = `<span class="cal-day-num">${day}</span>`;
     }
     tr.appendChild(td);
   }
@@ -516,11 +538,9 @@ function renderHome() {
     
     const isPart = getParticipation(movie.id); 
     const toggleText = isPart ? '参加' : '非参加';
-
     let detailText = `${movie.scenes.length}件のシーン`;
     if(movie.director) detailText += ` ｜ 監督: ${movie.director}`;
     if(movie.year) detailText += ` ｜ ${movie.year}年`;
-
     let editBtnHtml = isEditorMode ? `<button class="edit-title-btn" onclick="event.stopPropagation(); window.goMovieDetails(${movie.id})">編集</button>` : '';
     const icon = movie.icon || '🎬';
 
@@ -586,6 +606,7 @@ function createItemInputHTML(type, item = null) {
 window.addCostumeInput = function(containerId, item = null) { document.getElementById(containerId).appendChild(createItemInputHTML('costume', item)); };
 window.addPropInput = function(containerId, item = null) { document.getElementById(containerId).appendChild(createItemInputHTML('prop', item)); };
 
+// 🌟 サジェストで選んだ時に、ステータスも引き継ぐようにしました！
 window.showSuggestions = function(inputElem, type) {
   const name = inputElem.value.trim();
   const block = inputElem.closest('.item-input-block');
@@ -602,8 +623,8 @@ window.showSuggestions = function(inputElem, type) {
   movie.scenes.forEach(s => {
     const items = (type === 'costume' ? s.costumes : s.props) || [];
     items.forEach(i => {
-      if(i.name.includes(name) && (i.desc || i.price)) {
-        const key = i.name + '|' + i.desc + '|' + i.price;
+      if(i.name.includes(name) && (i.desc || i.price || i.status)) {
+        const key = i.name + '|' + i.desc + '|' + i.price + '|' + i.status;
         if(!seen.has(key)) {
           seen.add(key);
           candidates.push(i);
@@ -620,8 +641,13 @@ window.showSuggestions = function(inputElem, type) {
       inputElem.value = c.name;
       const descInput = block.querySelector('.item-desc');
       const priceInput = block.querySelector('.item-price');
+      const statusInput = block.querySelector('.item-status');
       if(descInput) descInput.value = c.desc;
       if(priceInput) priceInput.value = c.price;
+      if(statusInput && c.status) {
+        statusInput.value = c.status;
+        updateSelectColor(statusInput);
+      }
       suggestionContainer.innerHTML = ''; 
     };
     suggestionContainer.appendChild(chip);
@@ -732,18 +758,21 @@ window.clearSearch = function(doRender = true) {
   if(doRender) renderSearchResults();
 };
 
+// 🌟 日付や場所の「未定」を検索で引っ掛けられるようにしました！
 function getUniqueProperties(movie, propName) {
   const items = new Set();
   movie.scenes.forEach(s => {
-    if (propName === 'date' || propName === 'dates') {
-      (s.dates || []).forEach(d => items.add(d));
-    } else if(s[propName]) {
-      items.add(s[propName]);
+    if (propName === 'dates') {
+      if(s.dates && s.dates.length > 0) s.dates.forEach(d => items.add(d));
+      else items.add('未定');
+    } else {
+      if(s[propName]) items.add(s[propName]);
+      else if(propName === 'location') items.add('未定');
     }
   });
-  let arr = Array.from(items).filter(x => x);
+  let arr = Array.from(items);
   if (propName === 'number') {
-    arr.sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
+    arr.sort((a, b) => String(a).localeCompare(String(b), undefined, {numeric: true, sensitivity: 'base'}));
   } else {
     arr.sort();
   }
@@ -913,13 +942,20 @@ function renderInventory(movie, listContainer, typeKey) {
     details.className = 'accordion inventory-accordion';
     
     const summary = document.createElement('summary');
-    summary.innerHTML = `${statusHtml}${name} <span style="font-weight:normal; font-size:12px; color:var(--muted-text); margin-left:auto;">(${matchingScenes.length}件)</span>`;
+    // 🌟 2行になっても綺麗に表示されるように作りました！
+    summary.innerHTML = `
+      <div style="display:flex; align-items:flex-start; width:100%;">
+        <div style="flex-shrink:0; margin-top:2px;">${statusHtml}</div>
+        <div style="flex:1; word-break:break-all; line-height:1.4;">${name}</div>
+        <div style="flex-shrink:0; white-space:nowrap; margin-left:8px; font-weight:normal; font-size:12px; color:var(--muted-text);">(${matchingScenes.length}件)</div>
+      </div>
+    `;
     details.appendChild(summary);
 
     const content = document.createElement('div');
     content.className = 'accordion-content';
     
-    matchingScenes.sort((a, b) => a.number.localeCompare(b.number, undefined, {numeric: true, sensitivity: 'base'})).forEach(scene => {
+    matchingScenes.sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, {numeric: true, sensitivity: 'base'})).forEach(scene => {
       content.appendChild(createSceneCard(scene));
     });
     
@@ -947,18 +983,25 @@ window.renderSearchResults = function() {
   const filterProp = document.getElementById('search-prop').value;
 
   if(filterNum) displayScenes = displayScenes.filter(s => String(s.number) === String(filterNum));
-  if(filterLoc) displayScenes = displayScenes.filter(s => s.location === filterLoc);
-  if(filterDate) displayScenes = displayScenes.filter(s => s.dates && s.dates.includes(filterDate));
+  if(filterLoc) {
+    if(filterLoc === '未定') displayScenes = displayScenes.filter(s => !s.location);
+    else displayScenes = displayScenes.filter(s => s.location === filterLoc);
+  }
+  if(filterDate) {
+    if(filterDate === '未定') displayScenes = displayScenes.filter(s => !s.dates || s.dates.length === 0);
+    else displayScenes = displayScenes.filter(s => s.dates && s.dates.includes(filterDate));
+  }
   if(filterCos) displayScenes = displayScenes.filter(s => (s.costumes || []).some(c => c.name === filterCos));
   if(filterProp) displayScenes = displayScenes.filter(s => (s.props || []).some(p => p.name === filterProp));
 
-  displayScenes.sort((a, b) => a.number.localeCompare(b.number, undefined, {numeric: true, sensitivity: 'base'}));
+  displayScenes.sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, {numeric: true, sensitivity: 'base'}));
 
   displayScenes.forEach(scene => list.appendChild(createSceneCard(scene)));
   if(displayScenes.length === 0) list.innerHTML = '<p class="scene-info">条件に合うシーンが見つかりませんでした。</p>';
 };
 
 function renderMovie() {
+  const scrollY = window.scrollY; // スクロール位置を覚えます
   const movie = movies.find(m => m.id === currentMovieId);
   const list = document.getElementById('scene-list');
   list.innerHTML = '';
@@ -976,8 +1019,8 @@ function renderMovie() {
     let displayScenes = [...movie.scenes];
 
     displayScenes.sort((a, b) => {
-      if(currentSort === 'num-asc') return a.number.localeCompare(b.number, undefined, {numeric: true, sensitivity: 'base'});
-      if(currentSort === 'num-desc') return b.number.localeCompare(a.number, undefined, {numeric: true, sensitivity: 'base'});
+      if(currentSort === 'num-asc') return String(a.number).localeCompare(String(b.number), undefined, {numeric: true, sensitivity: 'base'});
+      if(currentSort === 'num-desc') return String(b.number).localeCompare(String(a.number), undefined, {numeric: true, sensitivity: 'base'});
       if(currentSort === 'date-asc' || currentSort === 'date-desc') {
         const dateA = (a.dates && a.dates.length > 0) ? [...a.dates].sort()[0] : null;
         const dateB = (b.dates && b.dates.length > 0) ? [...b.dates].sort()[0] : null;
@@ -991,6 +1034,8 @@ function renderMovie() {
 
     displayScenes.forEach(scene => list.appendChild(createSceneCard(scene)));
   }
+  // 描画が終わったら、そっとスクロール位置を戻します
+  setTimeout(() => window.scrollTo(0, scrollY), 0);
 }
 
 function renderSceneViewDetail() {
@@ -1011,11 +1056,13 @@ function renderSceneViewDetail() {
   if(scene.costumes && scene.costumes.length > 0) {
     let html = `<strong style="color: var(--text-color);">衣装</strong><br>`;
     scene.costumes.forEach(c => {
-      html += `<div style="padding: 8px; border-left: 2px solid var(--border-color); margin-bottom: 4px; background: rgba(0,0,0,0.02);">
-        <span class="status-color status-${c.status}" style="padding:2px 4px; font-size:11px;">${c.status}</span> 
-        <strong>${c.name}</strong>
-        ${c.desc ? `<div class="scene-info" style="margin-top: 2px;">${c.desc}</div>` : ''}
-        ${c.price ? `<div class="scene-info" style="color:var(--muted-text);">${c.price}</div>` : ''}
+      html += `<div style="padding: 8px; border-left: 2px solid var(--border-color); margin-bottom: 4px; background: rgba(0,0,0,0.02); display:flex; flex-direction:column; align-items:flex-start;">
+        <div style="display:flex; align-items:flex-start; width:100%;">
+          <span class="status-color status-${c.status}" style="padding:2px 4px; font-size:11px; flex-shrink:0; margin-right:6px; margin-top:2px;">${c.status}</span> 
+          <strong style="word-break:break-all; line-height:1.4;">${c.name}</strong>
+        </div>
+        ${c.desc ? `<div class="scene-info" style="margin-top: 4px; width:100%; word-break:break-all;">${c.desc}</div>` : ''}
+        ${c.price ? `<div class="scene-info" style="color:var(--muted-text); width:100%; word-break:break-all;">${c.price}</div>` : ''}
       </div>`;
     });
     cList.innerHTML = html;
@@ -1026,11 +1073,13 @@ function renderSceneViewDetail() {
   if(scene.props && scene.props.length > 0) {
     let html = `<strong style="color: var(--text-color);">小道具</strong><br>`;
     scene.props.forEach(p => {
-      html += `<div style="padding: 8px; border-left: 2px solid var(--border-color); margin-bottom: 4px; background: rgba(0,0,0,0.02);">
-        <span class="status-color status-${p.status}" style="padding:2px 4px; font-size:11px;">${p.status}</span> 
-        <strong>${p.name}</strong>
-        ${p.desc ? `<div class="scene-info" style="margin-top: 2px;">${p.desc}</div>` : ''}
-        ${p.price ? `<div class="scene-info" style="color:var(--muted-text);">${p.price}</div>` : ''}
+      html += `<div style="padding: 8px; border-left: 2px solid var(--border-color); margin-bottom: 4px; background: rgba(0,0,0,0.02); display:flex; flex-direction:column; align-items:flex-start;">
+        <div style="display:flex; align-items:flex-start; width:100%;">
+          <span class="status-color status-${p.status}" style="padding:2px 4px; font-size:11px; flex-shrink:0; margin-right:6px; margin-top:2px;">${p.status}</span> 
+          <strong style="word-break:break-all; line-height:1.4;">${p.name}</strong>
+        </div>
+        ${p.desc ? `<div class="scene-info" style="margin-top: 4px; width:100%; word-break:break-all;">${p.desc}</div>` : ''}
+        ${p.price ? `<div class="scene-info" style="color:var(--muted-text); width:100%; word-break:break-all;">${p.price}</div>` : ''}
       </div>`;
     });
     pList.innerHTML = html;
