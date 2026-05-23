@@ -24,6 +24,7 @@ body { font-family: "Helvetica Neue", Arial, sans-serif; background-color: var(-
 
 .header { background-color: var(--header-bg); color: #fdfdfd; padding: 12px 20px; font-weight: bold; position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--accent-color);}
 .header-left { display: flex; align-items: center; }
+.header-right { display: flex; align-items: center; gap: 8px; }
 .header-logo { height: 40px; width: 40px; margin-right: 16px; object-fit: contain; background: white; border-radius: 50%; padding: 2px;}
 .breadcrumb { font-size: 12px; color: #a3a3a3; margin-bottom: 2px;}
 .breadcrumb-link { cursor: pointer; transition: color 0.2s; }
@@ -37,8 +38,11 @@ body { font-family: "Helvetica Neue", Arial, sans-serif; background-color: var(-
 .movie-list-item { display: flex; justify-content: space-between; align-items: center; }
 .movie-info { flex: 1; cursor: pointer; }
 .movie-actions { display: flex; gap: 8px; align-items: center; margin-left: 16px;}
-.edit-title-btn { background-color: var(--card-bg); color: var(--text-color); border: 2px solid var(--border-color); padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; width: auto; margin: 0;}
+.edit-title-btn, .delete-movie-btn { background-color: var(--card-bg); color: var(--text-color); border: 2px solid var(--border-color); padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; width: auto; margin: 0;}
 .edit-title-btn:hover { background-color: rgba(0,0,0,0.03); }
+.delete-movie-btn { color: var(--accent-color); border-color: var(--accent-color); }
+.delete-movie-btn:hover { background-color: rgba(191, 54, 54, 0.05); }
+
 .participation-toggle { background-color: var(--card-bg); color: var(--muted-text); border: 2px solid var(--border-color); padding: 8px 16px; width: auto; margin: 0; border-radius: 4px; font-size: 13px; font-weight: bold; transition: all 0.2s;}
 .participation-toggle.active { background-color: #e3f2fd; color: #1565c0; border-color: #1565c0; }
 body.dark-mode .participation-toggle.active { background-color: #0d3b75; color: #bbdefb; border-color: #bbdefb;}
@@ -49,20 +53,24 @@ input[type="file"] { margin: 8px 0; color: var(--text-color); font-size: 13px;}
 details.accordion { margin-bottom: 12px; border: 1px solid var(--border-color); border-radius: 2px; background: var(--input-bg);}
 details.accordion > summary { padding: 12px; cursor: pointer; font-weight: bold; background: rgba(0,0,0,0.03); list-style: none; display: block; border-bottom: 1px solid transparent;}
 details.accordion > summary::-webkit-details-marker { display: none; }
-details.accordion > summary::before { content: '▶ '; display: inline-block; transition: 0.2s; font-size: 12px; margin-right: 4px; color: var(--muted-text);}
+details.accordion > summary::before { content: '[+] '; display: inline-block; transition: 0.2s; font-size: 12px; margin-right: 4px; color: var(--muted-text); font-family: monospace;}
 details[open].accordion > summary { border-bottom: 1px solid var(--border-color); }
-details[open].accordion > summary::before { transform: rotate(90deg); }
+details[open].accordion > summary::before { content: '[-] '; }
 details.accordion .accordion-content { padding: 12px; animation: nyuru 0.25s cubic-bezier(0, 1, 0.5, 1) forwards; transform-origin: top; overflow: hidden;}
 details.sub-accordion { margin-top: 16px; }
 
+/* 衣装・小道具一覧用のアコーディオン（少しデザインを変えています） */
+details.inventory-accordion { margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 2px; background: var(--card-bg); }
+details.inventory-accordion > summary { padding: 12px; cursor: pointer; font-weight: bold; background: rgba(0,0,0,0.02); }
+details.inventory-accordion .accordion-content { padding: 8px 12px 12px 12px; background: var(--bg-color); }
+
 @keyframes nyuru {
   from { opacity: 0; transform: scaleY(0.9); max-height: 0;}
-  to { opacity: 1; transform: scaleY(1); max-height: 1000px;}
+  to { opacity: 1; transform: scaleY(1); max-height: 2000px;}
 }
 
 .item-input-block { border: 2px dashed var(--border-color); padding: 12px; margin-bottom: 12px; position: relative; background: var(--bg-color); border-radius: 2px;}
 .item-remove-btn { position: absolute; top: 8px; right: 8px; background: transparent; border: none; color: var(--muted-text); padding: 4px; width: auto; font-size: 16px; margin: 0; cursor: pointer;}
-.item-remove-btn:hover { color: var(--accent-color); }
 .item-status { font-weight: bold; width: auto; padding: 4px 8px; margin-bottom: 8px; display: inline-block;}
 
 .date-dial-container { display: flex; gap: 8px; align-items: center; margin: 4px 0 12px 0; }
@@ -71,6 +79,12 @@ details.sub-accordion { margin-top: 16px; }
 
 .sort-filter-bar { display: flex; gap: 8px; }
 .sort-filter-bar select { width: auto; padding: 4px 24px 4px 8px; margin: 0; font-size: 12px;}
+
+/* 検索パネル */
+.search-panel { border-top: 4px solid var(--header-bg); background: var(--card-bg); margin-bottom: 24px; }
+.search-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.search-grid label { margin-top: 0; }
+.search-grid select { margin: 4px 0 0 0; }
 
 button { background-color: var(--text-color); color: var(--bg-color); border: 1px solid var(--text-color); padding: 10px 16px; border-radius: 2px; cursor: pointer; font-size: 14px; width: 100%; margin-top: 8px; font-weight: bold;}
 button.secondary { background-color: transparent; color: var(--text-color); margin-top: 16px;}
@@ -83,6 +97,7 @@ button.icon-btn { width: auto; padding: 6px 12px; margin: 0; background-color: t
 .hidden { display: none !important; }
 h2 { margin-top: 0; font-size: 20px; color: var(--text-color); border-left: 4px solid var(--header-bg); padding-left: 8px;}
 h3 { margin-top: 0; font-size: 16px; color: var(--text-color); border-bottom: 1px solid var(--border-color); padding-bottom: 4px;}
+.section-title { margin-top: 0; margin-bottom: 16px; font-size: 18px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px;}
 
 .status-color { font-size: 13px; font-weight: bold; border-radius: 2px; border-width: 2px !important; }
 .status-未着手 { background-color: transparent; color: #a82e2e; border-color: #a82e2e !important;}
@@ -112,10 +127,6 @@ body.dark-mode .calendar-table th { background: #333; }
 body.dark-mode .cal-marker { background-color: rgba(255,255,255,0.05); border-left: 2px solid #888;}
 
 .scene-info { font-size: 13px; color: var(--muted-text); margin-top: 6px; line-height: 1.5;}
-.inventory-header { border-left: 3px solid var(--accent-color); padding-left: 8px; margin-top: 24px; font-size: 15px; background: rgba(0,0,0,0.03); padding-top: 4px; padding-bottom: 4px;}
-body.dark-mode .inventory-header { background: rgba(255,255,255,0.05); }
-
-/* 修正：衣装と小道具のラベルにしっかり色がつくようにしました */
 .item-badge { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 2px; margin-right: 4px; margin-bottom: 4px; border: 1px solid var(--border-color); font-weight: bold;}
 
 .view-toggles { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; border-bottom: 2px solid var(--border-color); padding-bottom: 4px;}

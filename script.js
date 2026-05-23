@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAHgLjOMvSN88rLlLwNDrv4JQBGE-Bg6Ik",
@@ -30,12 +30,7 @@ function migrateSceneData(scene) {
     scene.costumes = [];
     if (scene.costumeName) {
       scene.costumeName.split(',').forEach((name, i) => {
-        if(name.trim()) {
-          scene.costumes.push({
-            id: 'c' + Date.now() + i, name: name.trim(),
-            status: scene.costumeStatus || '未着手', desc: scene.costumeDesc || '', price: scene.costumePrice || ''
-          });
-        }
+        if(name.trim()) scene.costumes.push({ id: 'c' + Date.now() + i, name: name.trim(), status: scene.costumeStatus || '未着手', desc: scene.costumeDesc || '', price: scene.costumePrice || '' });
       });
     }
   }
@@ -43,12 +38,7 @@ function migrateSceneData(scene) {
     scene.props = [];
     if (scene.propName) {
       scene.propName.split(',').forEach((name, i) => {
-        if(name.trim()) {
-          scene.props.push({
-            id: 'p' + Date.now() + i, name: name.trim(),
-            status: scene.propStatus || '未着手', desc: scene.propDesc || '', price: scene.propPrice || ''
-          });
-        }
+        if(name.trim()) scene.props.push({ id: 'p' + Date.now() + i, name: name.trim(), status: scene.propStatus || '未着手', desc: scene.propDesc || '', price: scene.propPrice || '' });
       });
     }
   }
@@ -68,11 +58,12 @@ onSnapshot(moviesRef, (snapshot) => {
       goHome();
     } else {
       updateDataLists();
+      populateSearchFilters();
       renderMovie();
       if(currentSceneId) renderSceneDetail();
     }
-  } else if (document.getElementById('view-daily').classList.contains('hidden') === false) {
-    
+  } else if (!document.getElementById('view-daily').classList.contains('hidden')) {
+    // 予定画面の場合は再描画保留
   } else {
     renderHome();
   }
@@ -80,6 +71,15 @@ onSnapshot(moviesRef, (snapshot) => {
 
 async function saveMovie(movie) {
   await setDoc(doc(db, "movies", movie.id.toString()), movie);
+}
+
+// 🗑️ 映画をまるごと削除する魔法です
+async function deleteMovie(movieId, event) {
+  event.stopPropagation();
+  const movie = movies.find(m => m.id === movieId);
+  if(confirm(`映画「${movie.title}」を本当に削除しますか？\n登録されたシーンもすべて消えてしまいます……。`)) {
+    await deleteDoc(doc(db, "movies", movieId.toString()));
+  }
 }
 
 function editMovieTitle(movieId, event) {
@@ -92,9 +92,7 @@ function editMovieTitle(movieId, event) {
   }
 }
 
-function getParticipation(movieId) {
-  return localStorage.getItem('part_' + movieId) === 'true'; 
-}
+function getParticipation(movieId) { return localStorage.getItem('part_' + movieId) === 'true'; }
 function toggleParticipation(movieId, event) {
   event.stopPropagation(); 
   const current = getParticipation(movieId);
@@ -187,7 +185,13 @@ function showView(viewId) {
   document.getElementById('view-daily').classList.add('hidden');
   document.getElementById(viewId).classList.remove('hidden');
 
-  // アコーディオンを閉じる魔法です
+  if(viewId === 'view-movie') {
+    document.getElementById('header-search-btn').classList.remove('hidden');
+  } else {
+    document.getElementById('header-search-btn').classList.add('hidden');
+    document.getElementById('search-panel').classList.add('hidden');
+  }
+
   const newSceneDetails = document.getElementById('new-scene-details');
   if (newSceneDetails) newSceneDetails.removeAttribute('open');
 }
@@ -213,11 +217,10 @@ function goMovie(movieId) {
   document.getElementById('header-title-sub').textContent = movie.title;
   document.getElementById('header-main-title').textContent = movie.title;
   
-  currentSort = 'num-asc';
-  document.getElementById('sort-select').value = 'num-asc';
-  
+  clearSearch(false);
   updateDataLists();
-  renderMovie(); 
+  populateSearchFilters();
+  setViewMode('list');
   showView('view-movie'); 
 }
 
@@ -266,7 +269,6 @@ function handleExcelUpload(event) {
     
     rows.forEach((row, index) => {
       if (!row || row.length === 0) return;
-      
       const number = String(row[0] || '');
       const date = parseExcelDate(row[1]);
       const sceneName = String(row[2] || '');
@@ -275,17 +277,13 @@ function handleExcelUpload(event) {
       const costumes = row[5] ? row[5].split(',').map((n,i)=>({id:'c'+Date.now()+i+Math.random(), name:n.trim(), status:row[4]||'未着手', desc:row[6]||'', price:row[7]||''})) : [];
       const props = row[9] ? row[9].split(',').map((n,i)=>({id:'p'+Date.now()+i+Math.random(), name:n.trim(), status:row[8]||'未着手', desc:row[10]||'', price:row[11]||''})) : [];
 
-      // 同じシーン番号、シーン名、場所のものがあったら、ひとつの箱にまとめます……！
       const existing = newScenes.find(s => s.number === number && s.sceneName === sceneName && s.location === location);
       if (existing) {
         if(costumes.length > 0) existing.costumes.push(...costumes);
         if(props.length > 0) existing.props.push(...props);
       } else {
         newScenes.push({
-          id: Date.now() + index,
-          number: number, date: date,
-          sceneName: sceneName, location: location,
-          costumes: costumes, props: props
+          id: Date.now() + index, number: number, date: date, sceneName: sceneName, location: location, costumes: costumes, props: props
         });
       }
     });
@@ -305,9 +303,9 @@ function renderGlobalCalendar() {
   const header = document.createElement('div');
   header.className = 'cal-header';
   header.innerHTML = `
-    <button onclick="changeGlobalCalMonth(-1)">◀</button>
+    <button onclick="changeGlobalCalMonth(-1)">&lt; 前月</button>
     <strong>${globalCalYear}年 ${globalCalMonth + 1}月</strong>
-    <button onclick="changeGlobalCalMonth(1)">▶</button>
+    <button onclick="changeGlobalCalMonth(1)">次月 &gt;</button>
   `;
   container.appendChild(header);
 
@@ -344,7 +342,7 @@ function renderGlobalCalendar() {
       dayScenes.forEach(item => {
         const marker = document.createElement('span');
         marker.className = 'cal-marker';
-        marker.innerHTML = `・ [${item.movie.title}] S${item.scene.number}`;
+        marker.innerHTML = `[${item.movie.title}] S${item.scene.number}`;
         marker.onclick = (e) => { e.stopPropagation(); goScene(item.scene.id, item.movie.id); };
         td.appendChild(marker);
       });
@@ -398,7 +396,7 @@ function renderHome() {
     
     const isPart = getParticipation(movie.id); 
     const toggleClass = isPart ? 'active' : '';
-    const toggleText = isPart ? '参加' : '不参加';
+    const toggleText = isPart ? '参加中' : '不参加';
 
     div.innerHTML = `
       <div class="movie-info" onclick="goMovie(${movie.id})">
@@ -406,8 +404,9 @@ function renderHome() {
         <div class="scene-info" style="margin-left: 12px; margin-top: 0;">${movie.scenes.length}件のシーン</div>
       </div>
       <div class="movie-actions">
-        <button class="edit-title-btn" onclick="editMovieTitle(${movie.id}, event)">編集</button>
         <button class="participation-toggle ${toggleClass}" onclick="toggleParticipation(${movie.id}, event)">${toggleText}</button>
+        <button class="edit-title-btn" onclick="editMovieTitle(${movie.id}, event)">[編集]</button>
+        <button class="delete-movie-btn" onclick="deleteMovie(${movie.id}, event)">[削除]</button>
       </div>
     `;
     list.appendChild(div);
@@ -433,7 +432,7 @@ function createItemInputHTML(type, item = null) {
   div.dataset.id = id;
   
   div.innerHTML = `
-    <button type="button" class="item-remove-btn" onclick="this.closest('.item-input-block').remove()" title="この枠を消す">×</button>
+    <button type="button" class="item-remove-btn" onclick="this.closest('.item-input-block').remove()" title="この枠を消す">[x]</button>
     <select class="item-status status-color status-${status}" onchange="updateSelectColor(this)">
       <option value="未着手" ${status==='未着手'?'selected':''}>未着手</option>
       <option value="準備中" ${status==='準備中'?'selected':''}>準備中</option>
@@ -554,13 +553,59 @@ function deleteScene() {
   }
 }
 
+// 🔍 検索パネルを開け閉めする魔法です
+function toggleSearchPanel() {
+  const panel = document.getElementById('search-panel');
+  panel.classList.toggle('hidden');
+}
+function clearSearch(doRender = true) {
+  ['number', 'location', 'date', 'costume', 'prop'].forEach(id => {
+    document.getElementById('search-' + id).value = '';
+  });
+  if(doRender) renderMovie();
+}
+
+function getUniqueProperties(movie, propName) {
+  const items = new Set();
+  movie.scenes.forEach(s => {
+    if(s[propName]) items.add(s[propName]);
+  });
+  return Array.from(items).filter(x => x).sort();
+}
 function getUniqueItemNames(movie, typeKey) {
   const names = new Set();
   movie.scenes.forEach(s => {
     const items = typeKey === 'costumes' ? s.costumes : s.props;
     items.forEach(item => names.add(item.name));
   });
-  return Array.from(names);
+  return Array.from(names).sort();
+}
+
+function populateSearchFilters() {
+  const movie = movies.find(m => m.id === currentMovieId);
+  if(!movie) return;
+
+  const numSel = document.getElementById('search-number');
+  const locSel = document.getElementById('search-location');
+  const dateSel = document.getElementById('search-date');
+  const cosSel = document.getElementById('search-costume');
+  const propSel = document.getElementById('search-prop');
+
+  [numSel, locSel, dateSel, cosSel, propSel].forEach(s => {
+    const currentVal = s.value;
+    s.innerHTML = '<option value="">すべて</option>';
+    s.dataset.current = currentVal;
+  });
+
+  getUniqueProperties(movie, 'number').forEach(v => numSel.add(new Option(v, v)));
+  getUniqueProperties(movie, 'location').forEach(v => locSel.add(new Option(v, v)));
+  getUniqueProperties(movie, 'date').forEach(v => dateSel.add(new Option(v, v)));
+  getUniqueItemNames(movie, 'costumes').forEach(v => cosSel.add(new Option(v, v)));
+  getUniqueItemNames(movie, 'props').forEach(v => propSel.add(new Option(v, v)));
+
+  [numSel, locSel, dateSel, cosSel, propSel].forEach(s => {
+    if(s.dataset.current) s.value = s.dataset.current;
+  });
 }
 
 function updateDataLists() {
@@ -570,8 +615,8 @@ function updateDataLists() {
   const pList = document.getElementById('prop-datalist');
   
   cList.innerHTML = ''; pList.innerHTML = '';
-  getUniqueItemNames(movie, 'costumes').sort().forEach(i => cList.appendChild(new Option(i)));
-  getUniqueItemNames(movie, 'props').sort().forEach(i => pList.appendChild(new Option(i)));
+  getUniqueItemNames(movie, 'costumes').forEach(i => cList.appendChild(new Option(i)));
+  getUniqueItemNames(movie, 'props').forEach(i => pList.appendChild(new Option(i)));
 }
 
 function setViewMode(mode) {
@@ -581,9 +626,21 @@ function setViewMode(mode) {
   });
   document.getElementById('btn-view-' + mode).classList.add('active');
   
-  const bar = document.getElementById('sort-filter-bar');
-  if(mode === 'list') { bar.style.display = 'flex'; }
-  else { bar.style.display = 'none'; }
+  // 表示モードに合わせて並べ替えの選択肢を入れ替えます
+  const sortSel = document.getElementById('sort-select');
+  sortSel.innerHTML = '';
+  if(mode === 'list') {
+    sortSel.add(new Option('番号順 (昇順)', 'num-asc'));
+    sortSel.add(new Option('番号順 (降順)', 'num-desc'));
+    sortSel.add(new Option('撮影日が早い順', 'date-asc'));
+    sortSel.add(new Option('撮影日が遅い順', 'date-desc'));
+    currentSort = 'num-asc';
+  } else {
+    sortSel.add(new Option('名前順', 'name-asc'));
+    sortSel.add(new Option('最速使用日が早い順', 'date-asc'));
+    sortSel.add(new Option('使用シーンが多い順', 'count-desc'));
+    currentSort = 'name-asc';
+  }
   
   renderMovie();
 }
@@ -635,37 +692,63 @@ function getEarliestDate(movie, typeKey, itemName) {
   return dates[0];
 }
 
+// 📦 一覧をアコーディオンに閉まってみやすくする魔法です
 function renderInventory(movie, listContainer, typeKey, iconText) {
   let uniqueNames = getUniqueItemNames(movie, typeKey);
   
+  // 検索パネルの絞り込みを適用します
+  const filterCostume = document.getElementById('search-costume').value;
+  const filterProp = document.getElementById('search-prop').value;
+  if(typeKey === 'costumes' && filterCostume) uniqueNames = uniqueNames.filter(n => n === filterCostume);
+  if(typeKey === 'props' && filterProp) uniqueNames = uniqueNames.filter(n => n === filterProp);
+
   if(uniqueNames.length === 0) {
-    listContainer.innerHTML = '<p class="scene-info">まだ登録されていません。</p>';
+    listContainer.innerHTML = '<p class="scene-info">条件に合うアイテムがありません。</p>';
     return;
   }
 
+  // 並べ替え
   uniqueNames.sort((a, b) => {
-    let dateA = getEarliestDate(movie, typeKey, a);
-    let dateB = getEarliestDate(movie, typeKey, b);
-    if(!dateA && !dateB) return 0; 
-    if(!dateA) return 1;           
-    if(!dateB) return -1;          
-    return dateA.localeCompare(dateB);
+    if(currentSort === 'name-asc') return a.localeCompare(b);
+    if(currentSort === 'date-asc') {
+      let dateA = getEarliestDate(movie, typeKey, a);
+      let dateB = getEarliestDate(movie, typeKey, b);
+      if(!dateA && !dateB) return 0; 
+      if(!dateA) return 1;           
+      if(!dateB) return -1;          
+      return dateA.localeCompare(dateB);
+    }
+    if(currentSort === 'count-desc') {
+      const countA = movie.scenes.filter(s => (typeKey === 'costumes' ? s.costumes : s.props).some(i => i.name === a)).length;
+      const countB = movie.scenes.filter(s => (typeKey === 'costumes' ? s.costumes : s.props).some(i => i.name === b)).length;
+      return countB - countA;
+    }
+    return 0;
   });
 
   uniqueNames.forEach(name => {
-    const earliest = getEarliestDate(movie, typeKey, name);
-    const header = document.createElement('h4');
-    header.className = 'inventory-header';
-    header.innerHTML = `${iconText} ${name} <span style="font-size:12px; color:#666; font-weight:normal;">(最速使用日: ${earliest || '未定'})</span>`;
-    listContainer.appendChild(header);
-    
     const matchingScenes = movie.scenes.filter(s => {
       const items = typeKey === 'costumes' ? s.costumes : s.props;
       return items.some(i => i.name === name);
     });
+    
+    // アコーディオンの箱を作ります
+    const details = document.createElement('details');
+    details.className = 'accordion inventory-accordion';
+    
+    const summary = document.createElement('summary');
+    summary.innerHTML = `${iconText} ${name} <span style="font-weight:normal; font-size:12px; color:var(--muted-text);">(${matchingScenes.length}件)</span>`;
+    details.appendChild(summary);
+
+    const content = document.createElement('div');
+    content.className = 'accordion-content';
+    
     matchingScenes.sort((a, b) => Number(a.number) - Number(b.number)).forEach(scene => {
-      listContainer.appendChild(createSceneCard(scene));
+      content.appendChild(createSceneCard(scene));
     });
+    
+    details.appendChild(content);
+    listContainer.appendChild(details);
   });
 }
 
@@ -686,6 +769,19 @@ function renderMovie() {
   } else {
     let displayScenes = [...movie.scenes];
 
+    // 🔍 検索パネルの絞り込みを適用します
+    const filterNum = document.getElementById('search-number').value;
+    const filterLoc = document.getElementById('search-location').value;
+    const filterDate = document.getElementById('search-date').value;
+    const filterCos = document.getElementById('search-costume').value;
+    const filterProp = document.getElementById('search-prop').value;
+
+    if(filterNum) displayScenes = displayScenes.filter(s => s.number === filterNum);
+    if(filterLoc) displayScenes = displayScenes.filter(s => s.location === filterLoc);
+    if(filterDate) displayScenes = displayScenes.filter(s => s.date === filterDate);
+    if(filterCos) displayScenes = displayScenes.filter(s => s.costumes.some(c => c.name === filterCos));
+    if(filterProp) displayScenes = displayScenes.filter(s => s.props.some(p => p.name === filterProp));
+
     displayScenes.sort((a, b) => {
       if(currentSort === 'num-asc') return Number(a.number) - Number(b.number);
       if(currentSort === 'num-desc') return Number(b.number) - Number(a.number);
@@ -699,6 +795,7 @@ function renderMovie() {
     });
 
     displayScenes.forEach(scene => list.appendChild(createSceneCard(scene)));
+    if(displayScenes.length === 0) list.innerHTML = '<p class="scene-info">条件に合うシーンが見つかりませんでした。</p>';
   }
 }
 
@@ -735,6 +832,7 @@ function saveEditedScene() {
   scene.props = collectItemsFromDOM('edit-prop-list');
 
   saveMovie(movie); 
+  populateSearchFilters();
   alert('シーンの変更を保存しました。');
 }
 
@@ -748,6 +846,7 @@ window.goMovie = goMovie;
 window.goScene = goScene;
 window.closeSceneDetail = closeSceneDetail;
 window.addMovie = addMovie;
+window.deleteMovie = deleteMovie;
 window.editMovieTitle = editMovieTitle;
 window.toggleParticipation = toggleParticipation;
 window.handleExcelUpload = handleExcelUpload;
@@ -763,3 +862,5 @@ window.addCostumeInput = addCostumeInput;
 window.addPropInput = addPropInput;
 window.autoFillItem = autoFillItem;
 window.saveEditedScene = saveEditedScene;
+window.toggleSearchPanel = toggleSearchPanel;
+window.clearSearch = clearSearch;
