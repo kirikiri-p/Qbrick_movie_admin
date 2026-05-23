@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 🌟 検索エンジンに見つからないようにする魔法です！ -->
+<meta name="robots" content="noindex, nofollow">
 <title>撮影管理アプリ</title>
-<!-- 🌟 タブのアイコンを追加しました！ -->
 <link rel="icon" href="Qbrick_icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="style.css">
@@ -25,7 +26,8 @@
     </div>
     <div class="header-right">
       <button class="icon-btn hidden" id="header-search-btn" style="color: white !important;" onclick="goSearch()">検索</button>
-      <button class="icon-btn" onclick="toggleDarkMode()" id="dark-mode-btn" style="color: white !important;">🌙</button>
+      <!-- 🌟 ダークモードのボタンをより確実に動く形にしました -->
+      <button class="icon-btn" id="dark-mode-btn" style="color: white !important; font-size: 16px;">🌙</button>
     </div>
   </div>
 
@@ -36,10 +38,10 @@
     <div class="card card-no-click editor-only" style="margin-top: 24px;">
       <h3>新しい映画を登録</h3>
       <input type="text" id="new-movie-title" placeholder="映画のタイトルを手入力">
-      <button onclick="addMovie()">追加する</button>
+      <button id="btn-add-movie">追加する</button>
       
       <h4 style="margin-top: 24px; color: var(--accent-color);">Excelから読み込む</h4>
-      <input type="file" id="excel-upload" accept=".xlsx, .xls" onchange="handleExcelUpload(event)">
+      <input type="file" id="excel-upload" accept=".xlsx, .xls">
       <a href="Qbrick_管理テンプレート.xlsx" download class="template-download-link">📥 テンプレートをダウンロード</a>
     </div>
 
@@ -49,7 +51,7 @@
     </div>
 
     <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
-      <button id="editor-toggle-btn" class="secondary" style="width: auto; font-size: 13px; color: var(--muted-text); border: 1px solid var(--border-color);" onclick="toggleEditorMode()">編集者モードになる</button>
+      <button id="editor-toggle-btn" class="secondary" style="width: auto; font-size: 13px; color: var(--muted-text); border: 1px solid var(--border-color);">編集者モードになる</button>
     </div>
   </div>
 
@@ -78,16 +80,23 @@
       <label class="input-label">年度</label>
       <input type="number" id="movie-detail-year" placeholder="例: 2026">
       
-      <button style="background-color: #2e7d32; border-color: #2e7d32; margin-top: 24px;" onclick="saveMovieDetails()">更新して一覧に戻る</button>
+      <button style="background-color: #2e7d32; border-color: #2e7d32; margin-top: 24px;" id="btn-save-movie-details">更新して一覧に戻る</button>
     </div>
 
-    <button class="danger" onclick="deleteMovieFromDetails()">この映画を完全に削除する</button>
+    <button class="danger" id="btn-delete-movie-details">この映画を完全に削除する</button>
   </div>
 
+  <!-- 🌟 カレンダーから詳細を開いた時に、左にリスト、右に詳細を並べるための枠組みです！ -->
   <div id="view-daily" class="container hidden">
-    <button class="secondary sticky-back-btn" onclick="goHome()">&lt; カレンダーに戻る</button>
-    <h2 id="daily-date-title" style="border-bottom: 3px solid #1976d2; padding-bottom: 8px;">撮影予定</h2>
-    <div id="daily-scene-list-container"></div>
+    <div class="split-layout">
+      <div class="list-pane" id="daily-list-pane">
+        <button class="secondary sticky-back-btn" onclick="goHome()">&lt; カレンダーに戻る</button>
+        <h2 id="daily-date-title" class="section-title" style="color: #1976d2;">撮影予定</h2>
+        <div id="daily-scene-list-container"></div>
+      </div>
+      <!-- 🌟 カレンダーから来た時は、ここに詳細画面（detail-pane）が移動してきます -->
+      <div class="detail-pane-container" id="daily-detail-container"></div>
+    </div>
   </div>
 
   <div id="view-search" class="container hidden">
@@ -96,11 +105,11 @@
     
     <div class="card search-panel">
       <div class="search-grid">
-        <div><label class="input-label">シーン番号</label><select id="search-number" onchange="renderSearchResults()"><option value="">すべて</option></select></div>
-        <div><label class="input-label">場所</label><select id="search-location" onchange="renderSearchResults()"><option value="">すべて</option></select></div>
-        <div><label class="input-label">日付</label><select id="search-date" onchange="renderSearchResults()"><option value="">すべて</option></select></div>
-        <div><label class="input-label">衣装名</label><select id="search-costume" onchange="renderSearchResults()"><option value="">すべて</option></select></div>
-        <div><label class="input-label">物品名</label><select id="search-prop" onchange="renderSearchResults()"><option value="">すべて</option></select></div>
+        <div><label class="input-label">シーン番号</label><select id="search-number"></select></div>
+        <div><label class="input-label">場所</label><select id="search-location"></select></div>
+        <div><label class="input-label">日付</label><select id="search-date"></select></div>
+        <div><label class="input-label">衣装名</label><select id="search-costume"></select></div>
+        <div><label class="input-label">物品名</label><select id="search-prop"></select></div>
       </div>
       <button class="secondary" style="margin-top: 12px; width: auto;" onclick="clearSearch()">条件をクリア</button>
     </div>
@@ -157,47 +166,52 @@
         <button class="secondary" onclick="goHome()">&lt; 映画一覧に戻る</button>
       </div>
 
-      <div class="detail-pane" id="detail-pane">
+      <!-- 🌟 映画一覧から来た時は、ここに詳細画面が移動してきます -->
+      <div class="detail-pane-container" id="movie-detail-container">
         
-        <div id="detail-pane-view">
-          <button class="close-btn" onclick="closeSceneDetail()">✕ 閉じる</button>
-          <div class="card card-no-click">
-            <h3 id="view-scene-header" style="margin-bottom: 4px;"></h3>
-            <div id="view-scene-info" class="scene-info" style="margin-bottom: 16px;"></div>
-            <div id="view-scene-costumes" style="margin-bottom: 12px;"></div>
-            <div id="view-scene-props"></div>
+        <!-- ▼▼▼ ここから下が、移動する詳細画面（detail-pane）の本体です ▼▼▼ -->
+        <div class="detail-pane" id="detail-pane">
+          <div id="detail-pane-view">
+            <button class="close-btn" onclick="closeSceneDetail()">✕ 閉じる</button>
+            <div class="card card-no-click">
+              <h3 id="view-scene-header" style="margin-bottom: 4px;"></h3>
+              <div id="view-scene-info" class="scene-info" style="margin-bottom: 16px;"></div>
+              <div id="view-scene-costumes" style="margin-bottom: 12px;"></div>
+              <div id="view-scene-props"></div>
+            </div>
+            <button class="editor-only" onclick="openSceneEdit()">このシーンを編集する</button>
           </div>
-          <button class="editor-only" onclick="openSceneEdit()">このシーンを編集する</button>
-        </div>
 
-        <div id="detail-pane-edit" class="hidden">
-          <button class="close-btn" onclick="cancelSceneEdit()">&lt; 編集をキャンセル</button>
-          <div class="card card-no-click">
-            <h3>シーン基本情報</h3>
-            <label class="input-label">シーン番号</label><input type="number" id="edit-scene-number">
-            <label class="input-label">シーン名</label><input type="text" id="edit-scene-name">
-            <label class="input-label">場所</label><input type="text" id="edit-scene-location">
+          <div id="detail-pane-edit" class="hidden">
+            <button class="close-btn" onclick="cancelSceneEdit()">&lt; 編集をキャンセル</button>
+            <div class="card card-no-click">
+              <h3>シーン基本情報</h3>
+              <label class="input-label">シーン番号</label><input type="number" id="edit-scene-number">
+              <label class="input-label">シーン名</label><input type="text" id="edit-scene-name">
+              <label class="input-label">場所</label><input type="text" id="edit-scene-location">
+              
+              <label class="input-label">撮影日を変更</label>
+              <div id="edit-scene-dates"></div>
+              <button type="button" class="secondary" style="margin-top: 4px;" onclick="addDateInput('edit-scene-dates')">撮影日を追加</button>
+            </div>
+
+            <div class="card card-no-click">
+              <h3 style="color: #c2185b;">衣装の登録</h3>
+              <div id="edit-costume-list"></div>
+              <button type="button" class="secondary" onclick="addCostumeInput('edit-costume-list')">衣装枠を追加</button>
+            </div>
+
+            <div class="card card-no-click">
+              <h3 style="color: #1976d2;">小道具の登録</h3>
+              <div id="edit-prop-list"></div>
+              <button type="button" class="secondary" onclick="addPropInput('edit-prop-list')">小道具枠を追加</button>
+            </div>
             
-            <label class="input-label">撮影日を変更</label>
-            <div id="edit-scene-dates"></div>
-            <button type="button" class="secondary" style="margin-top: 4px;" onclick="addDateInput('edit-scene-dates')">撮影日を追加</button>
+            <button style="background-color: #2e7d32; border-color: #2e7d32; padding: 16px; font-size: 16px; margin-bottom: 24px;" onclick="saveEditedScene()">このシーンの変更を保存</button>
+            <button class="danger" onclick="deleteScene()">このシーンだけ削除する</button>
           </div>
-
-          <div class="card card-no-click">
-            <h3 style="color: #c2185b;">衣装の登録</h3>
-            <div id="edit-costume-list"></div>
-            <button type="button" class="secondary" onclick="addCostumeInput('edit-costume-list')">衣装枠を追加</button>
-          </div>
-
-          <div class="card card-no-click">
-            <h3 style="color: #1976d2;">小道具の登録</h3>
-            <div id="edit-prop-list"></div>
-            <button type="button" class="secondary" onclick="addPropInput('edit-prop-list')">小道具枠を追加</button>
-          </div>
-          
-          <button style="background-color: #2e7d32; border-color: #2e7d32; padding: 16px; font-size: 16px; margin-bottom: 24px;" onclick="saveEditedScene()">このシーンの変更を保存</button>
-          <button class="danger" onclick="deleteScene()">このシーンだけ削除する</button>
         </div>
+        <!-- ▲▲▲ ここまでが詳細画面本体 ▲▲▲ -->
 
       </div>
     </div>
