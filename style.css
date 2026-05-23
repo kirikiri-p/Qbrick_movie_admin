@@ -59,7 +59,6 @@ details[open].accordion > summary::before { content: '[-] '; }
 details.accordion .accordion-content { padding: 12px; animation: nyuru 0.25s cubic-bezier(0, 1, 0.5, 1) forwards; transform-origin: top; overflow: hidden;}
 details.sub-accordion { margin-top: 16px; }
 
-/* 衣装・小道具一覧用のアコーディオン（少しデザインを変えています） */
 details.inventory-accordion { margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 2px; background: var(--card-bg); }
 details.inventory-accordion > summary { padding: 12px; cursor: pointer; font-weight: bold; background: rgba(0,0,0,0.02); }
 details.inventory-accordion .accordion-content { padding: 8px 12px 12px 12px; background: var(--bg-color); }
@@ -80,7 +79,6 @@ details.inventory-accordion .accordion-content { padding: 8px 12px 12px 12px; ba
 .sort-filter-bar { display: flex; gap: 8px; }
 .sort-filter-bar select { width: auto; padding: 4px 24px 4px 8px; margin: 0; font-size: 12px;}
 
-/* 検索パネル */
 .search-panel { border-top: 4px solid var(--header-bg); background: var(--card-bg); margin-bottom: 24px; }
 .search-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .search-grid label { margin-top: 0; }

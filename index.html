@@ -25,7 +25,7 @@
       </div>
     </div>
     <div class="header-right">
-      <button class="icon-btn hidden" id="header-search-btn" onclick="toggleSearchPanel()">[+] 検索・絞り込み</button>
+      <button class="icon-btn hidden" id="header-search-btn" onclick="goSearch()">検索</button>
       <button class="icon-btn" onclick="toggleDarkMode()" id="dark-mode-btn">ダークモード</button>
     </div>
   </div>
@@ -55,36 +55,41 @@
     <div id="daily-scene-list-container"></div>
   </div>
 
-  <div id="view-movie" class="container hidden">
+  <!-- 🌟 新しく作った、検索専用のお部屋です -->
+  <div id="view-search" class="container hidden">
+    <button class="secondary sticky-back-btn" onclick="goMovie(currentMovieId)">&lt; 映画詳細に戻る</button>
+    <h2 class="section-title">シーンの検索</h2>
     
-    <!-- 検索（絞り込み）パネルです -->
-    <div id="search-panel" class="card search-panel hidden">
-      <h4>シーンを検索する</h4>
+    <div class="card search-panel">
       <div class="search-grid">
         <div>
           <label class="input-label">シーン番号</label>
-          <select id="search-number" onchange="renderMovie()"><option value="">すべて</option></select>
+          <select id="search-number" onchange="renderSearchResults()"><option value="">すべて</option></select>
         </div>
         <div>
           <label class="input-label">場所</label>
-          <select id="search-location" onchange="renderMovie()"><option value="">すべて</option></select>
+          <select id="search-location" onchange="renderSearchResults()"><option value="">すべて</option></select>
         </div>
         <div>
           <label class="input-label">日付</label>
-          <select id="search-date" onchange="renderMovie()"><option value="">すべて</option></select>
+          <select id="search-date" onchange="renderSearchResults()"><option value="">すべて</option></select>
         </div>
         <div>
           <label class="input-label">衣装名</label>
-          <select id="search-costume" onchange="renderMovie()"><option value="">すべて</option></select>
+          <select id="search-costume" onchange="renderSearchResults()"><option value="">すべて</option></select>
         </div>
         <div>
           <label class="input-label">物品名</label>
-          <select id="search-prop" onchange="renderMovie()"><option value="">すべて</option></select>
+          <select id="search-prop" onchange="renderSearchResults()"><option value="">すべて</option></select>
         </div>
       </div>
       <button class="secondary" style="margin-top: 12px; width: auto;" onclick="clearSearch()">検索条件をクリア</button>
     </div>
 
+    <div id="search-result-list"></div>
+  </div>
+
+  <div id="view-movie" class="container hidden">
     <div class="split-layout">
       <div class="list-pane" id="list-pane">
         
@@ -111,7 +116,7 @@
               </div>
 
               <details class="accordion sub-accordion">
-                <summary>[衣装] 詳細を追加</summary>
+                <summary>詳細を追加</summary>
                 <div class="accordion-content">
                   <div id="new-costume-list"></div>
                   <button type="button" class="secondary" onclick="addCostumeInput('new-costume-list')">[+] 衣装枠を追加</button>
@@ -119,7 +124,7 @@
               </details>
 
               <details class="accordion sub-accordion">
-                <summary>[小道具] 詳細を追加</summary>
+                <summary>詳細を追加</summary>
                 <div class="accordion-content">
                   <div id="new-prop-list"></div>
                   <button type="button" class="secondary" onclick="addPropInput('new-prop-list')">[+] 小道具枠を追加</button>
@@ -135,7 +140,6 @@
           <h3 style="border: none; margin: 0; padding: 0;">登録データの一覧</h3>
           
           <div class="sort-filter-bar" id="sort-filter-bar">
-            <!-- 状況に応じて、スクリプト側で中身を入れ替えます -->
             <select id="sort-select" onchange="updateSort(this.value)"></select>
           </div>
         </div>
