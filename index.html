@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- 🌟 検索エンジンに見つからないようにする魔法です！ -->
 <meta name="robots" content="noindex, nofollow">
 <title>撮影管理アプリ</title>
 <link rel="icon" href="Qbrick_icon.png">
@@ -26,8 +25,7 @@
     </div>
     <div class="header-right">
       <button class="icon-btn hidden" id="header-search-btn" style="color: white !important;" onclick="goSearch()">検索</button>
-      <!-- 🌟 ダークモードのボタンをより確実に動く形にしました -->
-      <button class="icon-btn" id="dark-mode-btn" style="color: white !important; font-size: 16px;">🌙</button>
+      <button class="icon-btn" onclick="toggleDarkMode()" id="dark-mode-btn" style="color: white !important; font-size: 16px;">🌙</button>
     </div>
   </div>
 
@@ -86,7 +84,6 @@
     <button class="danger" id="btn-delete-movie-details">この映画を完全に削除する</button>
   </div>
 
-  <!-- 🌟 カレンダーから詳細を開いた時に、左にリスト、右に詳細を並べるための枠組みです！ -->
   <div id="view-daily" class="container hidden">
     <div class="split-layout">
       <div class="list-pane" id="daily-list-pane">
@@ -94,7 +91,6 @@
         <h2 id="daily-date-title" class="section-title" style="color: #1976d2;">撮影予定</h2>
         <div id="daily-scene-list-container"></div>
       </div>
-      <!-- 🌟 カレンダーから来た時は、ここに詳細画面（detail-pane）が移動してきます -->
       <div class="detail-pane-container" id="daily-detail-container"></div>
     </div>
   </div>
@@ -166,10 +162,8 @@
         <button class="secondary" onclick="goHome()">&lt; 映画一覧に戻る</button>
       </div>
 
-      <!-- 🌟 映画一覧から来た時は、ここに詳細画面が移動してきます -->
       <div class="detail-pane-container" id="movie-detail-container">
         
-        <!-- ▼▼▼ ここから下が、移動する詳細画面（detail-pane）の本体です ▼▼▼ -->
         <div class="detail-pane" id="detail-pane">
           <div id="detail-pane-view">
             <button class="close-btn" onclick="closeSceneDetail()">✕ 閉じる</button>
@@ -211,7 +205,6 @@
             <button class="danger" onclick="deleteScene()">このシーンだけ削除する</button>
           </div>
         </div>
-        <!-- ▲▲▲ ここまでが詳細画面本体 ▲▲▲ -->
 
       </div>
     </div>

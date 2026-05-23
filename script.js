@@ -30,7 +30,6 @@ let isEditorMode = false;
 let globalCalYear = new Date().getFullYear();
 let globalCalMonth = new Date().getMonth();
 
-// 🌟 ダークモードのボタンを確実に動かす魔法です！
 let isDarkMode = false;
 document.addEventListener('DOMContentLoaded', () => {
   const darkModeBtn = document.getElementById('dark-mode-btn');
@@ -47,7 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 編集者モードボタンや保存ボタンの配線もここでしっかり繋ぎます
   const btnAddMovie = document.getElementById('btn-add-movie');
   if(btnAddMovie) btnAddMovie.addEventListener('click', addMovie);
 
@@ -152,7 +150,8 @@ window.closeSceneDetail = () => {
   const detailPane = document.getElementById('detail-pane');
   detailPane.classList.remove('show-detail');
   currentSceneId = null;
-  
+  document.body.style.overflow = ''; 
+
   const currentHash = window.location.hash.replace('#', '');
   if (currentHash.startsWith('daily/')) {
     const dateStr = currentHash.split('/')[1];
@@ -163,6 +162,7 @@ window.closeSceneDetail = () => {
 };
 
 function executeGoHome(isDataUpdate) {
+  document.body.style.overflow = '';
   currentMovieId = null;
   renderHome(); 
   document.getElementById('header-movie-title-nav').classList.add('hidden');
@@ -171,6 +171,7 @@ function executeGoHome(isDataUpdate) {
 }
 
 function executeGoMovie(mId, isDataUpdate) {
+  document.body.style.overflow = '';
   currentMovieId = mId; 
   selectedSceneIds.clear();
   document.getElementById('bulk-delete-btn').classList.add('hidden');
@@ -183,7 +184,7 @@ function executeGoMovie(mId, isDataUpdate) {
   
   if(!isDataUpdate && renderedMovieId !== currentMovieId) {
     document.getElementById('new-scene-dates').innerHTML = '';
-    addDateInput('new-scene-dates');
+    window.addDateInput('new-scene-dates');
     setViewMode('list');
     populateSearchFilters();
     renderMovie();
@@ -197,7 +198,6 @@ function executeGoMovie(mId, isDataUpdate) {
   showViewUI('view-movie'); 
 }
 
-// 🌟 カレンダーから来た時は、左に日別リスト、右に詳細を並べる魔法です！
 function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   currentMovieId = mId;
   currentSceneId = sId;
@@ -236,9 +236,13 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   }
 
   detailPane.classList.add('show-detail');
+  if(window.innerWidth < 800) {
+    document.body.style.overflow = 'hidden';
+  }
 }
 
 function executeGoSearch(mId, isDataUpdate) {
+  document.body.style.overflow = '';
   currentMovieId = mId;
   populateSearchFilters();
   if(!isDataUpdate) clearSearch(false);
@@ -247,6 +251,7 @@ function executeGoSearch(mId, isDataUpdate) {
 }
 
 function executeGoMovieDetails(mId, isDataUpdate) {
+  document.body.style.overflow = '';
   currentMovieId = mId;
   const movie = movies.find(m => m.id === currentMovieId);
   if(!movie) return;
@@ -261,6 +266,7 @@ function executeGoMovieDetails(mId, isDataUpdate) {
 }
 
 function executeGoDaily(dateStr, isDataUpdate, skipRenderIfLoaded = false) {
+  document.body.style.overflow = '';
   renderedDailyDate = dateStr;
   document.getElementById('header-movie-title-nav').classList.remove('hidden');
   document.getElementById('header-title-sub').textContent = `${dateStr} の予定`;
@@ -270,7 +276,6 @@ function executeGoDaily(dateStr, isDataUpdate, skipRenderIfLoaded = false) {
   const container = document.getElementById('daily-scene-list-container');
   
   if (skipRenderIfLoaded && container.children.length > 0) {
-    // 描画済みならスキップしてスクロールを維持
   } else {
     container.innerHTML = '';
     let activeScenes = [];
@@ -331,7 +336,7 @@ window.toggleEditorMode = function() {
 
 async function saveMovie(movie) { await setDoc(doc(db, "movies", movie.id.toString()), movie); }
 
-function saveMovieDetails() {
+window.saveMovieDetails = function() {
   const movie = movies.find(m => m.id === currentMovieId);
   movie.title = document.getElementById('movie-detail-title').value.trim();
   movie.icon = document.getElementById('movie-detail-icon').value.trim();
@@ -341,15 +346,15 @@ function saveMovieDetails() {
   if(!movie.title) { alert('タイトルは必須です。'); return; }
   saveMovie(movie);
   window.goHome();
-}
+};
 
-async function deleteMovieFromDetails() {
+window.deleteMovieFromDetails = async function() {
   const movie = movies.find(m => m.id === currentMovieId);
   if(confirm(`映画「${movie.title}」を本当に削除しますか？`)) {
     await deleteDoc(doc(db, "movies", currentMovieId.toString()));
     window.goHome();
   }
-}
+};
 
 function getParticipation(movieId) { return localStorage.getItem('part_' + movieId) === 'true'; }
 window.toggleParticipation = function(movieId) {
@@ -405,16 +410,16 @@ window.cancelSceneEdit = function() {
   document.getElementById('detail-pane-view').classList.remove('hidden');
 };
 
-function addMovie() {
+window.addMovie = function() {
   const titleInput = document.getElementById('new-movie-title');
   const title = titleInput.value.trim();
   if (!title) return;
   const newMovie = { id: Date.now(), title: title, scenes: [], type: '', director: '', year: '', icon: '🎬' };
   saveMovie(newMovie); 
   titleInput.value = '';
-}
+};
 
-function handleExcelUpload(event) {
+window.handleExcelUpload = function(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -468,7 +473,7 @@ function handleExcelUpload(event) {
     alert(movieTitle + ' のデータを読み込みました。');
   };
   reader.readAsArrayBuffer(file);
-}
+};
 
 window.exportToExcel = function() {
   const movie = movies.find(m => m.id === currentMovieId);
@@ -1061,10 +1066,13 @@ function renderMovie() {
   const scrollY = window.scrollY; 
   const movie = movies.find(m => m.id === currentMovieId);
   const list = document.getElementById('scene-list');
+  
+  list.style.minHeight = list.offsetHeight + 'px';
   list.innerHTML = '';
 
   if(!movie || movie.scenes.length === 0) {
     list.innerHTML = '<p class="scene-info">まだシーンがありません。</p>';
+    list.style.minHeight = '';
     return;
   }
 
@@ -1091,6 +1099,11 @@ function renderMovie() {
 
     displayScenes.forEach(scene => list.appendChild(createSceneCard(scene)));
   }
+
+  setTimeout(() => {
+    list.style.minHeight = '';
+    window.scrollTo(0, scrollY);
+  }, 0);
 }
 
 function renderSceneViewDetail() {
