@@ -1,12 +1,58 @@
+// 🔥 Firebaseの魔法の杖（CDN）を借りてきます
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// プロデューサーさんが持ってきてくれた「魔法の鍵」です……！
+const firebaseConfig = {
+  apiKey: "AIzaSyAHgLjOMvSN88rLlLwNDrv4JQBGE-Bg6Ik",
+  authDomain: "qbrick-movie-admin.firebaseapp.com",
+  projectId: "qbrick-movie-admin",
+  storageBucket: "qbrick-movie-admin.firebasestorage.app",
+  messagingSenderId: "50401921198",
+  appId: "1:50401921198:web:d53a5e16c2e82449ac853f",
+  measurementId: "G-ZY07VHWJGG"
+};
+
+// Firebaseの保管庫と繋ぎます……！
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const moviesRef = collection(db, "movies");
+
 let movies = [];
 let currentMovieId = null;
 let currentSceneId = null;
-let currentViewMode = 'list'; // list, cos, prop
-let currentSort = 'num-asc'; // num-asc, num-desc, date-asc, date-desc
-let currentFilter = 'all'; // all, unfinished-cos, unfinished-prop
+let currentViewMode = 'list'; 
+let currentSort = 'num-asc'; 
+let currentFilter = 'all'; 
 
 let globalCalYear = new Date().getFullYear();
 let globalCalMonth = new Date().getMonth();
+
+// 📡 誰かがデータを変更したら、自動でみんなの画面を更新する魔法です
+onSnapshot(moviesRef, (snapshot) => {
+  movies = [];
+  snapshot.forEach((doc) => {
+    movies.push(doc.data());
+  });
+  
+  // 今開いている画面に合わせて再描画します
+  if (currentMovieId) {
+    if (!movies.find(m => m.id === currentMovieId)) {
+      goHome();
+    } else {
+      updateDataLists();
+      renderMovie();
+      if(currentSceneId) renderSceneDetail();
+    }
+  } else {
+    renderHome();
+  }
+});
+
+// ☁️ 保管庫（Firestore）にデータを預ける魔法です
+async function saveMovie(movie) {
+  await setDoc(doc(db, "movies", movie.id.toString()), movie);
+}
 
 let isDarkMode = false;
 function toggleDarkMode() {
@@ -112,12 +158,10 @@ function goMovie(movieId) {
   closeSceneDetail();
   const movie = movies.find(m => m.id === currentMovieId);
   
-  // ヘッダーの文字を変えます
   document.getElementById('header-movie-title-nav').classList.remove('hidden');
   document.getElementById('header-title-sub').textContent = movie.title;
   document.getElementById('header-main-title').textContent = movie.title;
   
-  // 絞り込みをリセットします
   currentSort = 'num-asc';
   currentFilter = 'all';
   document.getElementById('sort-select').value = 'num-asc';
@@ -128,7 +172,6 @@ function goMovie(movieId) {
   showView('view-movie'); 
 }
 
-// 🌐 他の映画のシーンでも直接開けるようにしました
 function goScene(sceneId, forceMovieId = null) { 
   if(forceMovieId) {
     currentMovieId = forceMovieId;
@@ -156,16 +199,18 @@ function addMovie() {
   const titleInput = document.getElementById('new-movie-title');
   const title = titleInput.value.trim();
   if (!title) return;
-  movies.push({ id: Date.now(), title: title, scenes: [], isParticipating: true });
+  const newMovie = { id: Date.now(), title: title, scenes: [], isParticipating: true };
+  saveMovie(newMovie); // 保管庫に保存します
   titleInput.value = '';
-  renderHome();
 }
 
 function toggleParticipation(movieId, event) {
-  event.stopPropagation(); // カードが押されたことにならないように防ぎます
+  event.stopPropagation(); 
   const movie = movies.find(m => m.id === movieId);
-  movie.isParticipating = !movie.isParticipating;
-  renderHome();
+  if(movie) {
+    movie.isParticipating = !movie.isParticipating;
+    saveMovie(movie); // 保管庫に保存します
+  }
 }
 
 function handleExcelUpload(event) {
@@ -195,15 +240,14 @@ function handleExcelUpload(event) {
     });
 
     const movieTitle = file.name.replace(/\.[^/.]+$/, "");
-    movies.push({ id: Date.now(), title: movieTitle, scenes: newScenes, isParticipating: true });
-    renderHome();
+    const newMovie = { id: Date.now(), title: movieTitle, scenes: newScenes, isParticipating: true };
+    saveMovie(newMovie); // 保管庫に保存します
     document.getElementById('excel-upload').value = '';
     alert(movieTitle + ' のデータを読み込みました……！');
   };
   reader.readAsArrayBuffer(file);
 }
 
-// --- 🌐 全体カレンダーを描く魔法 ---
 function renderGlobalCalendar() {
   const container = document.getElementById('global-calendar');
   container.innerHTML = '';
@@ -227,7 +271,6 @@ function renderGlobalCalendar() {
   let tr = document.createElement('tr');
   for(let i = 0; i < firstDay; i++) tr.appendChild(document.createElement('td'));
   
-  // 「参加」になっている映画のシーンだけを集めます
   let activeScenes = [];
   movies.filter(m => m.isParticipating).forEach(m => {
     m.scenes.forEach(s => activeScenes.push({ movie: m, scene: s }));
@@ -239,8 +282,6 @@ function renderGlobalCalendar() {
     td.innerHTML = `<span class="cal-day-num">${day}</span>`;
     
     const dateStr = `${globalCalYear}-${('0'+(globalCalMonth+1)).slice(-2)}-${('0'+day).slice(-2)}`;
-    
-    // この日のシーンを探して表示します
     const dayScenes = activeScenes.filter(item => item.scene.date === dateStr || item.scene.date === dateStr.replace(/-0/g, '-')); 
     
     dayScenes.forEach(item => {
@@ -265,7 +306,7 @@ function changeGlobalCalMonth(diff) {
 }
 
 function renderHome() {
-  renderGlobalCalendar(); // カレンダーを更新します
+  renderGlobalCalendar(); 
 
   const list = document.getElementById('movie-list');
   list.innerHTML = '';
@@ -277,8 +318,7 @@ function renderHome() {
     const div = document.createElement('div');
     div.className = 'card movie-list-item';
     
-    // 参加・非参加のボタンを作ります
-    const isPart = movie.isParticipating !== false; // 古いデータ対策です
+    const isPart = movie.isParticipating !== false; 
     const toggleClass = isPart ? 'active' : '';
     const toggleText = isPart ? '✔ 参加中' : '非参加';
 
@@ -315,12 +355,11 @@ function addScene() {
     propStatus: '未着手', propName: '', propDesc: '', propPrice: ''
   });
 
+  saveMovie(movie); // 保管庫に保存します
   document.getElementById('scene-number').value = '';
   document.getElementById('scene-name').value = '';
   document.getElementById('scene-location').value = '';
   checkSceneInput();
-  updateDataLists();
-  renderMovie();
 }
 
 function deleteScene() {
@@ -328,8 +367,8 @@ function deleteScene() {
   if(confirm("本当にこのシーンを削除してもよろしいですか……？")) {
     const movie = movies.find(m => m.id === currentMovieId);
     movie.scenes = movie.scenes.filter(s => s.id !== currentSceneId);
+    saveMovie(movie); // 保管庫に保存します
     closeSceneDetail(); 
-    updateDataLists();
   }
 }
 
@@ -364,7 +403,6 @@ function setViewMode(mode) {
   });
   document.getElementById('btn-view-' + mode).classList.add('active');
   
-  // 衣装・小道具モードの時は、絞り込みメニューを隠します
   const bar = document.getElementById('sort-filter-bar');
   if(mode === 'list') { bar.style.display = 'flex'; }
   else { bar.style.display = 'none'; }
@@ -400,7 +438,6 @@ function createSceneCard(scene) {
   return div;
 }
 
-// 🕒 アイテムが「一番早く使われる日」を探す魔法です
 function getEarliestDate(movie, typeKey, itemName) {
   const scenes = movie.scenes.filter(s => splitItems(s[typeKey]).includes(itemName) && s.date);
   if(scenes.length === 0) return null;
@@ -416,13 +453,12 @@ function renderInventory(movie, listContainer, typeKey, icon) {
     return;
   }
 
-  // ★「使う日が早い順」に並べ替えます
   uniqueItems.sort((a, b) => {
     let dateA = getEarliestDate(movie, typeKey, a);
     let dateB = getEarliestDate(movie, typeKey, b);
-    if(!dateA && !dateB) return 0; // どちらも未定
-    if(!dateA) return 1;           // Aが未定なら後ろへ
-    if(!dateB) return -1;          // Bが未定なら後ろへ
+    if(!dateA && !dateB) return 0; 
+    if(!dateA) return 1;           
+    if(!dateB) return -1;          
     return dateA.localeCompare(dateB);
   });
 
@@ -445,7 +481,7 @@ function renderMovie() {
   const list = document.getElementById('scene-list');
   list.innerHTML = '';
 
-  if(movie.scenes.length === 0) {
+  if(!movie || movie.scenes.length === 0) {
     list.innerHTML = '<p class="scene-info">まだシーンがありません。</p>';
     return;
   }
@@ -455,17 +491,14 @@ function renderMovie() {
   } else if (currentViewMode === 'prop') {
     renderInventory(movie, list, 'propName', '📦');
   } else {
-    // リスト表示（絞り込み・並べ替え）
     let displayScenes = [...movie.scenes];
 
-    // 🔍 絞り込み
     if(currentFilter === 'unfinished-cos') {
       displayScenes = displayScenes.filter(s => s.costumeStatus === '未着手' || s.costumeStatus === '準備中');
     } else if (currentFilter === 'unfinished-prop') {
       displayScenes = displayScenes.filter(s => s.propStatus === '未着手' || s.propStatus === '準備中');
     }
 
-    // 🔄 並べ替え
     displayScenes.sort((a, b) => {
       if(currentSort === 'num-asc') return Number(a.number) - Number(b.number);
       if(currentSort === 'num-desc') return Number(b.number) - Number(a.number);
@@ -486,6 +519,7 @@ function renderMovie() {
 function renderSceneDetail() {
   const movie = movies.find(m => m.id === currentMovieId);
   const scene = movie.scenes.find(s => s.id === currentSceneId);
+  if(!scene) return;
   
   document.getElementById('edit-scene-number').value = scene.number || '';
   document.getElementById('edit-scene-name').value = scene.sceneName || '';
@@ -505,8 +539,6 @@ function renderSceneDetail() {
   document.getElementById('edit-prop-name').value = scene.propName || '';
   document.getElementById('edit-prop-desc').value = scene.propDesc || '';
   document.getElementById('edit-prop-price').value = scene.propPrice || '';
-
-  renderMovie();
 }
 
 function saveSceneBasicInfo() {
@@ -519,7 +551,7 @@ function saveSceneBasicInfo() {
   scene.location = document.getElementById('edit-scene-location').value;
   scene.date = getDialDate('ed'); 
   
-  renderMovie(); 
+  saveMovie(movie); 
 }
 
 function saveSceneDetail() {
@@ -537,6 +569,27 @@ function saveSceneDetail() {
   scene.propDesc = document.getElementById('edit-prop-desc').value;
   scene.propPrice = document.getElementById('edit-prop-price').value;
 
-  updateDataLists(); 
-  renderMovie(); 
+  saveMovie(movie); 
 }
+
+// 🌐 HTMLから呼び出せるように、おまじない（type="module"）の外に公開します
+window.toggleDarkMode = toggleDarkMode;
+window.updateDays = updateDays;
+window.checkSceneInput = checkSceneInput;
+window.updateSelectColor = updateSelectColor;
+window.scrollToTop = scrollToTop;
+window.goHome = goHome;
+window.goMovie = goMovie;
+window.goScene = goScene;
+window.closeSceneDetail = closeSceneDetail;
+window.addMovie = addMovie;
+window.toggleParticipation = toggleParticipation;
+window.handleExcelUpload = handleExcelUpload;
+window.changeGlobalCalMonth = changeGlobalCalMonth;
+window.addScene = addScene;
+window.deleteScene = deleteScene;
+window.setViewMode = setViewMode;
+window.updateSort = updateSort;
+window.updateFilter = updateFilter;
+window.saveSceneBasicInfo = saveSceneBasicInfo;
+window.saveSceneDetail = saveSceneDetail;
