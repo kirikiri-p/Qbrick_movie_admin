@@ -87,6 +87,14 @@ function migrateSceneData(scene) {
   return scene;
 }
 
+function linkify(text) {
+  if (!text) return '';
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return text.replace(urlRegex, url => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #1976d2; text-decoration: underline;">${url}</a>`;
+  });
+}
+
 window.addEventListener('hashchange', (e) => {
   if (e.oldURL) {
     const oldHash = e.oldURL.split('#')[1];
@@ -1261,14 +1269,19 @@ function renderSceneViewDetail() {
   let infoText = `場所: ${scene.location || '未定'} ｜ 撮影日: ${dateText}`;
   document.getElementById('view-scene-info').textContent = infoText;
   const memoArea = document.getElementById('view-scene-memo');
-  if (memoArea) {
-    if (scene.memo) {
-      memoArea.innerHTML = `<strong>メモ</strong><br><div style="white-space: pre-wrap; background: rgba(0,0,0,0.03); padding: 8px; border-radius: 4px;">${scene.memo}</div>`;
-      memoArea.style.display = 'block';
-    } else {
-      memoArea.style.display = 'none';
-    }
+if (memoArea) {
+  if (scene.memo) {
+    memoArea.innerHTML = `
+      <strong>メモ</strong><br>
+      <div style="white-space: pre-wrap; background: rgba(0,0,0,0.03); padding: 8px; border-radius: 4px; word-break: break-all;">
+        ${linkify(scene.memo)}
+      </div>
+    `;
+    memoArea.style.display = 'block';
+  } else {
+    memoArea.style.display = 'none';
   }
+}
 
   const cList = document.getElementById('view-scene-costumes');
   cList.innerHTML = '';
