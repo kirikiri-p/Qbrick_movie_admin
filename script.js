@@ -22,6 +22,7 @@ let currentViewMode = 'list';
 let currentSort = 'num-asc'; 
 let selectedSceneIds = new Set(); 
 let lastViewHash = 'home'; 
+let previousView = 'movie';
 
 let renderedMovieId = null;
 let renderedDailyDate = null;
@@ -137,6 +138,15 @@ window.showDailyScenes = (dateStr) => { window.location.hash = `daily/${dateStr}
 
 window.goScene = (sId, forceMovieId) => {
   const currentHash = window.location.hash.replace('#', '');
+  
+  if (currentHash.startsWith('search/')) {
+    previousView = 'search';
+  } else if (currentHash.startsWith('daily/')) {
+    previousView = 'daily';
+  } else {
+    previousView = 'movie';
+  }
+
   if (currentHash.startsWith('daily/')) {
     const dateStr = currentHash.split('/')[1];
     window.location.hash = `daily/${dateStr}/scene/${forceMovieId || currentMovieId}/${sId}`;
@@ -154,9 +164,13 @@ window.closeSceneDetail = () => {
   document.body.style.overflow = ''; 
 
   const currentHash = window.location.hash.replace('#', '');
+
   if (currentHash.startsWith('daily/')) {
     const dateStr = currentHash.split('/')[1];
     window.location.hash = `daily/${dateStr}`;
+  } else if (previousView === 'search') {
+    window.location.hash = `search/${currentMovieId}`;   // ← ここを追加
+    previousView = 'movie';
   } else {
     window.location.hash = `movie/${currentMovieId}`;
   }
