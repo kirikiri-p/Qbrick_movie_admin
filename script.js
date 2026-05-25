@@ -383,12 +383,14 @@ window.toggleEditorMode = function() {
     selectedSceneIds.clear();
     const bulkBtn = document.getElementById('bulk-delete-btn');
     if (bulkBtn) bulkBtn.classList.add('hidden');
+    alert('閲覧モードに戻りました');
   } else {
     const pass = prompt('編集者用パスワードを入力してください');
     if (pass === 'きゅーぶりっく') {
       isEditorMode = true;
       document.body.classList.add('editor-mode');
       document.getElementById('editor-toggle-btn').textContent = '閲覧モードに戻る';
+      alert('編集者モードに切り替わりました');
     } else if (pass !== null) {
       alert('パスワードが違います');
       return;
@@ -396,7 +398,7 @@ window.toggleEditorMode = function() {
   }
 
   renderHome();
-  
+
   const currentHash = window.location.hash.replace('#', '');
   if (currentHash.startsWith('search/')) {
     renderSearchResults();
@@ -989,7 +991,7 @@ function createSceneCard(scene, forceMovieId = null) {
 
   let html = `<div class="scene-card-header">`;
 
-  if (!forceMovieId && isEditorMode) {
+  if (isEditorMode) {
   const isShot = scene.status === '撮影済み';
   html += `
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
