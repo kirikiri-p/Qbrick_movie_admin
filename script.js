@@ -190,12 +190,15 @@ window.closeSceneDetail = () => {
   if (currentHash.startsWith('daily/')) {
     const dateStr = currentHash.split('/')[1];
     window.location.hash = `daily/${dateStr}`;
-  } 
-  else if (previousView === 'search') {
-    showViewUI('view-search');
+  } else if (previousView === 'search') {
+  executeGoSearch(currentMovieId, false, true);
+  
+  setTimeout(() => {
     restoreSearchFilters();
-    previousView = 'movie';
-  } 
+  }, 30);
+  
+  previousView = 'movie';
+}
   else {
     window.location.hash = `movie/${currentMovieId}`;
   }
