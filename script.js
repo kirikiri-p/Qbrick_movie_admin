@@ -178,13 +178,14 @@ window.closeSceneDetail = () => {
     const dateStr = currentHash.split('/')[1];
     window.location.hash = `daily/${dateStr}`;
   } else if (previousView === 'search') {
-  window.location.hash = `search/${currentMovieId}`;
-  // 少し遅延させてからフィルターを復元
+  executeGoSearch(currentMovieId, false, true);
+  
   setTimeout(() => {
     restoreSearchFilters();
-  }, 50);
+  }, 30);
+  
   previousView = 'movie';
-}  
+}
 };
 
 function restoreSearchFilters() {
@@ -283,11 +284,15 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   }
 }
 
-function executeGoSearch(mId, isDataUpdate) {
+function executeGoSearch(mId, isDataUpdate = false, preserveFilters = false) {
   document.body.style.overflow = '';
   currentMovieId = mId;
   populateSearchFilters();
-  if(!isDataUpdate) clearSearch(false);
+
+  if (!isDataUpdate && !preserveFilters) {
+    clearSearch(false);
+  }
+
   renderSearchResults();
   showViewUI('view-search');
 }
@@ -1105,8 +1110,13 @@ window.toggleSceneShotStatus = async function(sceneId, checkbox, forceMovieId, e
 
   await saveMovie(movie);
 
-  if (currentViewMode === 'list' || !currentViewMode) {
-    renderMovie();
+  const currentHash = window.location.hash.replace('#', '');
+  
+  if (currentHash.startsWith('search/')) {
+    renderSearchResults();
+  } else if (currentHash.startsWith('daily/')) {
+    const dateStr = currentHash.split('/')[1];
+    executeGoDaily(dateStr, true);
   } else {
     renderMovie();
   }
