@@ -31,6 +31,14 @@ let isEditorMode = false;
 let globalCalYear = new Date().getFullYear();
 let globalCalMonth = new Date().getMonth();
 
+let lastSearchFilters = {
+  number: '',
+  location: '',
+  date: '',
+  costume: '',
+  prop: ''
+};
+
 let isDarkMode = false;
 document.addEventListener('DOMContentLoaded', () => {
   const darkModeBtn = document.getElementById('dark-mode-btn');
@@ -75,6 +83,7 @@ function migrateSceneData(scene) {
     if (scene.propName) { scene.propName.split(',').forEach((n, i) => { if(n.trim()) scene.props.push({ id: 'p'+Date.now()+i, name: n.trim(), status: scene.propStatus||'未着手', desc: scene.propDesc||'', price: scene.propPrice||'' }); }); }
   }
   if (!scene.memo) scene.memo = '';
+  if (!scene.status) scene.status = '未撮影';
   return scene;
 }
 
@@ -169,12 +178,30 @@ window.closeSceneDetail = () => {
     const dateStr = currentHash.split('/')[1];
     window.location.hash = `daily/${dateStr}`;
   } else if (previousView === 'search') {
-    window.location.hash = `search/${currentMovieId}`;   // ← ここを追加
-    previousView = 'movie';
-  } else {
-    window.location.hash = `movie/${currentMovieId}`;
-  }
+  window.location.hash = `search/${currentMovieId}`;
+  // 少し遅延させてからフィルターを復元
+  setTimeout(() => {
+    restoreSearchFilters();
+  }, 50);
+  previousView = 'movie';
+}  
 };
+
+function restoreSearchFilters() {
+  const numSel = document.getElementById('search-number');
+  const locSel = document.getElementById('search-location');
+  const dateSel = document.getElementById('search-date');
+  const cosSel = document.getElementById('search-costume');
+  const propSel = document.getElementById('search-prop');
+
+  if (numSel) numSel.value = lastSearchFilters.number || '';
+  if (locSel) locSel.value = lastSearchFilters.location || '';
+  if (dateSel) dateSel.value = lastSearchFilters.date || '';
+  if (cosSel) cosSel.value = lastSearchFilters.costume || '';
+  if (propSel) propSel.value = lastSearchFilters.prop || '';
+
+  renderSearchResults();
+}
 
 function executeGoHome(isDataUpdate) {
   document.body.style.overflow = '';
@@ -666,7 +693,6 @@ function createItemInputHTML(type, item = null) {
       <option value="未着手" ${status==='未着手'?'selected':''}>未着手</option>
       <option value="準備中" ${status==='準備中'?'selected':''}>準備中</option>
       <option value="準備完了" ${status==='準備完了'?'selected':''}>準備完了</option>
-      <option value="使用済み" ${status==='使用済み'?'selected':''}>使用済み</option>
     </select>
     
     <div style="margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;">${type==='costume'?'衣装名':'小道具名'}</div>
@@ -927,15 +953,40 @@ function createSceneCard(scene, forceMovieId = null) {
   if(scene.id === currentSceneId) div.style.border = '2px solid var(--accent-color)';
   if(selectedSceneIds.has(scene.id)) div.classList.add('selected-card');
 
-  const overall = getSceneOverallStatus(scene);
-  div.classList.add(`scene-border-${overall}`);
+  let borderStatus = getSceneOverallStatus(scene);
+  if (scene.status === '撮影済み') {
+    borderStatus = 'used';
+  }
+  div.classList.add(`scene-border-${borderStatus}`);
 
   let html = `<div class="scene-card-header">`;
-  
-  if(!forceMovieId && isEditorMode) {
-    html += `<input type="checkbox" class="scene-checkbox" ${selectedSceneIds.has(scene.id)?'checked':''} onclick="window.toggleSceneSelection(${scene.id}, this, event)">`;
+
+  if (!forceMovieId && isEditorMode) {
+    const isShot = scene.status === '撮影済み';
+    html += `
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+        <input type="checkbox" class="scene-checkbox" 
+               ${selectedSceneIds.has(scene.id) ? 'checked' : ''} 
+               onclick="window.toggleSceneSelection(${scene.id}, this, event)">
+        
+        <label class="switch-container" style="margin-left:auto; margin-bottom:0;" 
+               onclick="event.stopPropagation();">
+          <span class="switch-label" style="font-size:11px; min-width:auto;">${isShot ? '撮影済み' : '未撮影'}</span>
+          <div class="switch" style="width:36px; height:20px;">
+            <input type="checkbox" ${isShot ? 'checked' : ''} 
+                   onchange="window.toggleSceneShotStatus(${scene.id}, this, ${forceMovieId || 'null'}, event)">
+            <span class="slider"></span>
+          </div>
+        </label>
+      </div>
+    `;
+  } 
+  else if (!forceMovieId && isEditorMode === false && scene.status === '撮影済み') {
+    html += `<div style="text-align:right; margin-bottom:4px;">
+      <span class="status-color status-使用済み" style="font-size:11px; padding:1px 6px;">撮影済み</span>
+    </div>`;
   }
-  
+
   html += `<div class="scene-content">`;
   html += `<strong>シーン ${scene.number}</strong>`;
   if(scene.sceneName) html += ` ｜ ${scene.sceneName}`;
@@ -1040,15 +1091,43 @@ function renderInventory(movie, listContainer, typeKey) {
   });
 }
 
+window.toggleSceneShotStatus = async function(sceneId, checkbox, forceMovieId, event) {
+  event.stopPropagation();
+
+  const movieId = forceMovieId || currentMovieId;
+  const movie = movies.find(m => m.id === movieId);
+  if (!movie) return;
+
+  const scene = movie.scenes.find(s => s.id === sceneId);
+  if (!scene) return;
+
+  scene.status = checkbox.checked ? '撮影済み' : '未撮影';
+
+  await saveMovie(movie);
+
+  if (currentViewMode === 'list' || !currentViewMode) {
+    renderMovie();
+  } else {
+    renderMovie();
+  }
+};
+
 window.renderSearchResults = function() {
   const movie = movies.find(m => m.id === currentMovieId);
   const list = document.getElementById('search-result-list');
   list.innerHTML = '';
 
   if(!movie || movie.scenes.length === 0) {
-    list.innerHTML = '<p class="scene-info">まだシーンがありません</p>';
+    list.innerHTML = '<p class="scene-info">まだシーンがありません。</p>';
     return;
   }
+
+  lastSearchFilters.number = document.getElementById('search-number').value;
+  lastSearchFilters.location = document.getElementById('search-location').value;
+  lastSearchFilters.date = document.getElementById('search-date').value;
+  lastSearchFilters.costume = document.getElementById('search-costume').value;
+  lastSearchFilters.prop = document.getElementById('search-prop').value;
+
 
   let displayScenes = [...movie.scenes];
 
