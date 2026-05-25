@@ -381,23 +381,28 @@ window.toggleEditorMode = function() {
     document.getElementById('editor-toggle-btn').textContent = '編集者モードになる';
     selectedSceneIds.clear();
     const bulkBtn = document.getElementById('bulk-delete-btn');
-    if(bulkBtn) bulkBtn.classList.add('hidden');
-    alert('閲覧モードに戻りました');
+    if (bulkBtn) bulkBtn.classList.add('hidden');
   } else {
     const pass = prompt('編集者用パスワードを入力してください');
     if (pass === 'きゅーぶりっく') {
       isEditorMode = true;
       document.body.classList.add('editor-mode');
       document.getElementById('editor-toggle-btn').textContent = '閲覧モードに戻る';
-      alert('編集者モードに切り替わりました');
     } else if (pass !== null) {
       alert('パスワードが違います');
+      return;
     }
   }
-  renderHome();
-  if (currentMovieId) renderMovie();
-};
 
+  renderHome();
+  
+  const currentHash = window.location.hash.replace('#', '');
+  if (currentHash.startsWith('search/')) {
+    renderSearchResults();
+  } else if (currentHash.startsWith('movie/') && currentMovieId) {
+    renderMovie();
+  }
+};
 async function saveMovie(movie) { await setDoc(doc(db, "movies", movie.id.toString()), movie); }
 
 window.saveMovieDetails = function() {
