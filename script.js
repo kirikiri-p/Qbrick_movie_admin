@@ -297,17 +297,63 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   }
 }
 
-function executeGoSearch(mId, isDataUpdate = false, preserveFilters = false) {
-  document.body.style.overflow = '';
+function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   currentMovieId = mId;
-  populateSearchFilters();
+  currentSceneId = sId;
+  const movie = movies.find(m => m.id === currentMovieId);
+  if(!movie) return;
+  
+  const detailPane = document.getElementById('detail-pane');
 
-  if (!isDataUpdate && !preserveFilters) {
-    clearSearch(false);
+  if (dailyDateStr) {
+    document.getElementById('header-movie-title-nav').classList.remove('hidden');
+    document.getElementById('header-title-sub').textContent = `${dailyDateStr} の予定`;
+    document.getElementById('daily-detail-container').appendChild(detailPane);
+    if(!isDataUpdate && renderedDailyDate !== dailyDateStr) {
+      executeGoDaily(dailyDateStr, false, true);
+    }
+    showViewUI('view-daily');
+  } 
+  else if (previousView === 'search') {
+    document.getElementById('header-movie-title-nav').classList.remove('hidden');
+    document.getElementById('header-title-sub').textContent = movie.title;
+
+    const searchResultContainer = document.getElementById('search-result-list');
+    if (searchResultContainer && searchResultContainer.parentElement) {
+      searchResultContainer.parentElement.appendChild(detailPane);
+    } else {
+      document.getElementById('movie-detail-container').appendChild(detailPane);
+    }
+
+    showViewUI('view-search');
+
+  } 
+  else {
+    document.getElementById('header-movie-title-nav').classList.remove('hidden');
+    document.getElementById('header-title-sub').textContent = movie.title;
+    document.getElementById('movie-detail-container').appendChild(detailPane);
+
+    if(!isDataUpdate && renderedMovieId !== currentMovieId) {
+      renderMovie();
+    }
+    showViewUI('view-movie');
   }
 
-  renderSearchResults();
-  showViewUI('view-search');
+  if(!isDataUpdate) {
+    document.getElementById('detail-pane-edit').classList.add('hidden');
+    document.getElementById('detail-pane-view').classList.remove('hidden');
+  }
+  
+  if(document.getElementById('detail-pane-edit').classList.contains('hidden')) {
+    renderSceneViewDetail(); 
+  } else if(!isDataUpdate) {
+    renderSceneEditDetail();
+  }
+
+  detailPane.classList.add('show-detail');
+  if(window.innerWidth < 800) {
+    document.body.style.overflow = 'hidden';
+  }
 }
 
 function executeGoMovieDetails(mId, isDataUpdate) {
