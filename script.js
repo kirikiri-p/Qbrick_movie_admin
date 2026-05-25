@@ -983,25 +983,25 @@ function createSceneCard(scene, forceMovieId = null) {
   let html = `<div class="scene-card-header">`;
 
   if (!forceMovieId && isEditorMode) {
-    const isShot = scene.status === '撮影済み';
-    html += `
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-        <input type="checkbox" class="scene-checkbox" 
-               ${selectedSceneIds.has(scene.id) ? 'checked' : ''} 
-               onclick="window.toggleSceneSelection(${scene.id}, this, event)">
-        
-        <label class="switch-container" style="margin-left:auto; margin-bottom:0;" 
-               onclick="event.stopPropagation();">
-          <span class="switch-label" style="font-size:11px; min-width:auto;">${isShot ? '撮影済み' : '未撮影'}</span>
-          <div class="switch" style="width:36px; height:20px;">
-            <input type="checkbox" ${isShot ? 'checked' : ''} 
-                   onchange="window.toggleSceneShotStatus(${scene.id}, this, ${forceMovieId || 'null'}, event)">
-            <span class="slider"></span>
-          </div>
-        </label>
-      </div>
-    `;
-  } 
+  const isShot = scene.status === '撮影済み';
+  html += `
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+      <input type="checkbox" class="scene-checkbox" 
+             ${selectedSceneIds.has(scene.id) ? 'checked' : ''} 
+             onclick="window.toggleSceneSelection(${scene.id}, this, event)">
+      
+      <label class="switch-container" style="margin-left:auto; margin-bottom:0;" 
+             onclick="event.stopPropagation();">
+        <span class="switch-label" style="font-size:11px; min-width:auto;">${isShot ? '撮影済み' : '未撮影'}</span>
+        <div class="switch" style="width:36px; height:20px;">
+          <input type="checkbox" ${isShot ? 'checked' : ''} 
+                 onchange="window.toggleSceneShotStatus(${scene.id}, this, ${forceMovieId ?? 'null'}, event)">
+          <span class="slider"></span>
+        </div>
+      </label>
+    </div>
+  `;
+}
   else if (!forceMovieId && isEditorMode === false && scene.status === '撮影済み') {
     html += `<div style="text-align:right; margin-bottom:4px;">
       <span class="status-color status-使用済み" style="font-size:11px; padding:1px 6px;">撮影済み</span>
@@ -1115,9 +1115,16 @@ function renderInventory(movie, listContainer, typeKey) {
 window.toggleSceneShotStatus = async function(sceneId, checkbox, forceMovieId, event) {
   event.stopPropagation();
 
-  const movieId = forceMovieId || currentMovieId;
+  let movieId = forceMovieId;
+  if (movieId === 'null' || movieId == null) {
+    movieId = currentMovieId;
+  }
+
   const movie = movies.find(m => m.id === movieId);
-  if (!movie) return;
+  if (!movie) {
+    console.error('映画が見つかりません', movieId);
+    return;
+  }
 
   const scene = movie.scenes.find(s => s.id === sceneId);
   if (!scene) return;
@@ -1127,7 +1134,6 @@ window.toggleSceneShotStatus = async function(sceneId, checkbox, forceMovieId, e
   await saveMovie(movie);
 
   const currentHash = window.location.hash.replace('#', '');
-  
   if (currentHash.startsWith('search/')) {
     renderSearchResults();
   } else if (currentHash.startsWith('daily/')) {
