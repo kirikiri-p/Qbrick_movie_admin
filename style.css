@@ -170,6 +170,9 @@ body.dark-mode .view-toggles button.active { background-color: #333; color: #fff
 
 @media (max-width: 799px) {
   .split-layout { flex-direction: column; }
+/* === 詳細ペインのレイアウト制御（PCで右側を広げたり狭めたりする） === */
+
+/* 基本は右側を狭くする */
 .detail-pane-container {
   flex: 0;
   min-width: 0;
@@ -177,38 +180,52 @@ body.dark-mode .view-toggles button.active { background-color: #333; color: #fff
   transition: flex 0.2s ease;
 }
 
+.detail-pane {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+/* 詳細が開いたら表示 */
 .detail-pane.show-detail {
   display: block;
 }
 
+/* PC（800px以上）：詳細が開いているときだけ右側にスペースを取る */
 @media (min-width: 800px) {
   .detail-pane-container:has(.detail-pane.show-detail) {
     flex: 1;
   }
 }
 
+/* モバイル（799px以下） */
 @media (max-width: 799px) {
+  .split-layout {
+    flex-direction: column;
+  }
+
   .detail-pane-container {
     flex: 1;
   }
-}
-  
-  .detail-pane.show-detail { 
-    display: block; 
-    position: fixed; 
-    top: 0; left: 0; right: 0; bottom: 0; 
-    z-index: 1000; 
+
+  .detail-pane.show-detail {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
     background-color: var(--bg-color);
     padding: 20px;
     box-sizing: border-box;
     max-height: 100vh;
     overflow-y: auto;
-    animation: nyoki-mobile 0.2s ease-out forwards;
   }
 }
-@keyframes nyoki { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes nyoki-mobile { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
+/* 編集画面の下部に余白 */
 #detail-pane-edit {
   padding-bottom: 40px;
-}
+}}
