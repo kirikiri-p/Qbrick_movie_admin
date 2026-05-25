@@ -297,6 +297,18 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   }
 }
 
+function executeGoSearch(mId, isDataUpdate = false, preserveFilters = false) {
+  document.body.style.overflow = '';
+  currentMovieId = mId;
+  populateSearchFilters();
+
+  if (!isDataUpdate && !preserveFilters) {
+    clearSearch(false);
+  }
+
+  renderSearchResults();
+  showViewUI('view-search');
+}
 
 function executeGoMovieDetails(mId, isDataUpdate) {
   document.body.style.overflow = '';
