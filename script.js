@@ -179,28 +179,28 @@ window.goScene = (sId, forceMovieId) => {
 
 window.backFromSearch = () => { window.location.hash = `movie/${currentMovieId}`; };
 
-window.closeSceneDetail = () => { 
+window.closeSceneDetail = () => {
   const detailPane = document.getElementById('detail-pane');
   detailPane.classList.remove('show-detail');
   currentSceneId = null;
-  document.body.style.overflow = ''; 
+  document.body.style.overflow = '';
 
   const currentHash = window.location.hash.replace('#', '');
 
   if (currentHash.startsWith('daily/')) {
     const dateStr = currentHash.split('/')[1];
     window.location.hash = `daily/${dateStr}`;
-  } else if (previousView === 'search') {
-  executeGoSearch(currentMovieId, false, true);
-  
-  setTimeout(() => {
-    restoreSearchFilters();
-  }, 30);
-  
-  previousView = 'movie';
-}
+  } 
+  else if (previousView === 'search') {
+    executeGoSearch(currentMovieId, false, true); // preserveFilters = true
+    setTimeout(() => {
+      restoreSearchFilters();
+    }, 40);
+    previousView = 'movie';
+  } 
   else {
     window.location.hash = `movie/${currentMovieId}`;
+    previousView = 'movie';
   }
 };
 
@@ -261,15 +261,15 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   currentMovieId = mId;
   currentSceneId = sId;
   const movie = movies.find(m => m.id === currentMovieId);
-  if(!movie) return;
-  
+  if (!movie) return;
+
   const detailPane = document.getElementById('detail-pane');
 
   if (dailyDateStr) {
     document.getElementById('header-movie-title-nav').classList.remove('hidden');
     document.getElementById('header-title-sub').textContent = `${dailyDateStr} の予定`;
     document.getElementById('daily-detail-container').appendChild(detailPane);
-    if(!isDataUpdate && renderedDailyDate !== dailyDateStr) {
+    if (!isDataUpdate && renderedDailyDate !== dailyDateStr) {
       executeGoDaily(dailyDateStr, false, true);
     }
     showViewUI('view-daily');
@@ -277,25 +277,26 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
     document.getElementById('header-movie-title-nav').classList.remove('hidden');
     document.getElementById('header-title-sub').textContent = movie.title;
     document.getElementById('movie-detail-container').appendChild(detailPane);
-    if(!isDataUpdate && renderedMovieId !== currentMovieId) {
+
+    if (!isDataUpdate && renderedMovieId !== currentMovieId) {
       renderMovie();
     }
-    showViewUI('view-movie'); 
+    showViewUI('view-movie');
   }
 
-  if(!isDataUpdate) {
+  if (!isDataUpdate) {
     document.getElementById('detail-pane-edit').classList.add('hidden');
     document.getElementById('detail-pane-view').classList.remove('hidden');
   }
-  
-  if(document.getElementById('detail-pane-edit').classList.contains('hidden')) {
-    renderSceneViewDetail(); 
-  } else if(!isDataUpdate) {
+
+  if (document.getElementById('detail-pane-edit').classList.contains('hidden')) {
+    renderSceneViewDetail();
+  } else if (!isDataUpdate) {
     renderSceneEditDetail();
   }
 
   detailPane.classList.add('show-detail');
-  if(window.innerWidth < 800) {
+  if (window.innerWidth < 800) {
     document.body.style.overflow = 'hidden';
   }
 }
