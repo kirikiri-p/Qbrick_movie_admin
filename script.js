@@ -297,17 +297,76 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   }
 }
 
-function executeGoSearch(mId, isDataUpdate = false, preserveFilters = false) {
-  document.body.style.overflow = '';
+function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   currentMovieId = mId;
-  populateSearchFilters();
+  currentSceneId = sId;
+  const movie = movies.find(m => m.id === currentMovieId);
+  if (!movie) return;
 
-  if (!isDataUpdate && !preserveFilters) {
-    clearSearch(false);
+  const detailPane = document.getElementById('detail-pane');
+
+  if (dailyDateStr) {
+    document.getElementById('header-movie-title-nav').classList.remove('hidden');
+    document.getElementById('header-title-sub').textContent = `${dailyDateStr} の予定`;
+    document.getElementById('daily-detail-container').appendChild(detailPane);
+    if (!isDataUpdate && renderedDailyDate !== dailyDateStr) {
+      executeGoDaily(dailyDateStr, false, true);
+    }
+    showViewUI('view-daily');
+
+  } else if (previousView === 'search') {
+    document.getElementById('header-movie-title-nav').classList.remove('hidden');
+    document.getElementById('header-title-sub').textContent = movie.title;
+
+    document.getElementById('movie-detail-container').appendChild(detailPane);
+
+    const sceneList = document.getElementById('scene-list');
+    if (sceneList) {
+      sceneList.innerHTML = '';
+      const movieData = movies.find(m => m.id === currentMovieId);
+      if (movieData) {
+        let filteredScenes = [...movieData.scenes];
+
+        const f = lastSearchFilters;
+        if (f.number) filteredScenes = filteredScenes.filter(s => String(s.number) === String(f.number));
+        if (f.location) filteredScenes = filteredScenes.filter(s => s.location === f.location);
+        if (f.date) filteredScenes = filteredScenes.filter(s => s.dates && s.dates.includes(f.date));
+        if (f.costume) filteredScenes = filteredScenes.filter(s => (s.costumes || []).some(c => c.name === f.costume));
+        if (f.prop) filteredScenes = filteredScenes.filter(s => (s.props || []).some(p => p.name === f.prop));
+
+        filteredScenes.forEach(scene => {
+          sceneList.appendChild(createSceneCard(scene));
+        });
+      }
+    }
+
+    showViewUI('view-movie');  
+  } else {
+    document.getElementById('header-movie-title-nav').classList.remove('hidden');
+    document.getElementById('header-title-sub').textContent = movie.title;
+    document.getElementById('movie-detail-container').appendChild(detailPane);
+
+    if (!isDataUpdate && renderedMovieId !== currentMovieId) {
+      renderMovie();
+    }
+    showViewUI('view-movie');
   }
 
-  renderSearchResults();
-  showViewUI('view-search');
+  if (!isDataUpdate) {
+    document.getElementById('detail-pane-edit').classList.add('hidden');
+    document.getElementById('detail-pane-view').classList.remove('hidden');
+  }
+
+  if (document.getElementById('detail-pane-edit').classList.contains('hidden')) {
+    renderSceneViewDetail();
+  } else if (!isDataUpdate) {
+    renderSceneEditDetail();
+  }
+
+  detailPane.classList.add('show-detail');
+  if (window.innerWidth < 800) {
+    document.body.style.overflow = 'hidden';
+  }
 }
 
 function executeGoMovieDetails(mId, isDataUpdate) {
