@@ -1156,7 +1156,7 @@ window.renderSearchResults = function() {
   const list = document.getElementById('search-result-list');
   list.innerHTML = '';
 
-  if(!movie || movie.scenes.length === 0) {
+  if (!movie || movie.scenes.length === 0) {
     list.innerHTML = '<p class="scene-info">まだシーンがありません。</p>';
     return;
   }
@@ -1167,31 +1167,38 @@ window.renderSearchResults = function() {
   lastSearchFilters.costume = document.getElementById('search-costume').value;
   lastSearchFilters.prop = document.getElementById('search-prop').value;
 
-
-  let displayScenes = [...movie.scenes];
-
   const filterNum = document.getElementById('search-number').value;
   const filterLoc = document.getElementById('search-location').value;
   const filterDate = document.getElementById('search-date').value;
   const filterCos = document.getElementById('search-costume').value;
   const filterProp = document.getElementById('search-prop').value;
 
-  if(filterNum) displayScenes = displayScenes.filter(s => String(s.number) === String(filterNum));
-  if(filterLoc) {
-    if(filterLoc === '未定') displayScenes = displayScenes.filter(s => !s.location);
+  if (!filterNum && !filterLoc && !filterDate && !filterCos && !filterProp) {
+    list.innerHTML = '<p class="scene-info">検索条件を選択してください</p>';
+    return;
+  }
+
+  let displayScenes = [...movie.scenes];
+
+  if (filterNum) displayScenes = displayScenes.filter(s => String(s.number) === String(filterNum));
+  if (filterLoc) {
+    if (filterLoc === '未定') displayScenes = displayScenes.filter(s => !s.location);
     else displayScenes = displayScenes.filter(s => s.location === filterLoc);
   }
-  if(filterDate) {
-    if(filterDate === '未定') displayScenes = displayScenes.filter(s => !s.dates || s.dates.length === 0);
+  if (filterDate) {
+    if (filterDate === '未定') displayScenes = displayScenes.filter(s => !s.dates || s.dates.length === 0);
     else displayScenes = displayScenes.filter(s => s.dates && s.dates.includes(filterDate));
   }
-  if(filterCos) displayScenes = displayScenes.filter(s => (s.costumes || []).some(c => c.name === filterCos));
-  if(filterProp) displayScenes = displayScenes.filter(s => (s.props || []).some(p => p.name === filterProp));
+  if (filterCos) displayScenes = displayScenes.filter(s => (s.costumes || []).some(c => c.name === filterCos));
+  if (filterProp) displayScenes = displayScenes.filter(s => (s.props || []).some(p => p.name === filterProp));
 
   displayScenes.sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, {numeric: true, sensitivity: 'base'}));
 
   displayScenes.forEach(scene => list.appendChild(createSceneCard(scene)));
-  if(displayScenes.length === 0) list.innerHTML = '<p class="scene-info">条件に合うシーンが見つかりませんでした</p>';
+
+  if (displayScenes.length === 0) {
+    list.innerHTML = '<p class="scene-info">条件に合うシーンが見つかりませんでした</p>';
+  }
 };
 
 function renderMovie() {
