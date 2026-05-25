@@ -170,7 +170,28 @@ body.dark-mode .view-toggles button.active { background-color: #333; color: #fff
 
 @media (max-width: 799px) {
   .split-layout { flex-direction: column; }
-  .detail-pane-container { position: static; max-height: none; }
+.detail-pane-container {
+  flex: 0;
+  min-width: 0;
+  overflow: hidden;
+  transition: flex 0.2s ease;
+}
+
+.detail-pane.show-detail {
+  display: block;
+}
+
+@media (min-width: 800px) {
+  .detail-pane-container:has(.detail-pane.show-detail) {
+    flex: 1;
+  }
+}
+
+@media (max-width: 799px) {
+  .detail-pane-container {
+    flex: 1;
+  }
+}
   
   .detail-pane.show-detail { 
     display: block; 

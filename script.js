@@ -182,6 +182,7 @@ window.backFromSearch = () => { window.location.hash = `movie/${currentMovieId}`
 window.closeSceneDetail = () => {
   const detailPane = document.getElementById('detail-pane');
   detailPane.classList.remove('show-detail');
+  detailPane.closest('.detail-pane-container')?.classList.remove('has-detail');
   currentSceneId = null;
   document.body.style.overflow = '';
 
@@ -294,8 +295,8 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   } else if (!isDataUpdate) {
     renderSceneEditDetail();
   }
-
   detailPane.classList.add('show-detail');
+  detailPane.closest('.detail-pane-container')?.classList.add('has-detail');
   if (window.innerWidth < 800) {
     document.body.style.overflow = 'hidden';
   }
