@@ -150,7 +150,20 @@ window.goScene = (sId, forceMovieId) => {
   
   if (currentHash.startsWith('search/')) {
     previousView = 'search';
-  } else if (currentHash.startsWith('daily/')) {
+    currentMovieId = forceMovieId || currentMovieId;
+    currentSceneId = sId;
+
+    lastSearchFilters.number = document.getElementById('search-number')?.value || '';
+    lastSearchFilters.location = document.getElementById('search-location')?.value || '';
+    lastSearchFilters.date = document.getElementById('search-date')?.value || '';
+    lastSearchFilters.costume = document.getElementById('search-costume')?.value || '';
+    lastSearchFilters.prop = document.getElementById('search-prop')?.value || '';
+
+    executeGoScene(sId, currentMovieId, null, false);
+    return;
+  }
+
+  if (currentHash.startsWith('daily/')) {
     previousView = 'daily';
   } else {
     previousView = 'movie';
@@ -177,15 +190,15 @@ window.closeSceneDetail = () => {
   if (currentHash.startsWith('daily/')) {
     const dateStr = currentHash.split('/')[1];
     window.location.hash = `daily/${dateStr}`;
-  } else if (previousView === 'search') {
-  executeGoSearch(currentMovieId, false, true);
-  
-  setTimeout(() => {
+  } 
+  else if (previousView === 'search') {
+    showViewUI('view-search');
     restoreSearchFilters();
-  }, 30);
-  
-  previousView = 'movie';
-}
+    previousView = 'movie';
+  } 
+  else {
+    window.location.hash = `movie/${currentMovieId}`;
+  }
 };
 
 function restoreSearchFilters() {
