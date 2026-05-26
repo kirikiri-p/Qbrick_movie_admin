@@ -840,6 +840,7 @@ window.addScene = function() {
   const name = document.getElementById('new-scene-name').value.trim();
   const loc = document.getElementById('new-scene-location').value.trim();
   const dates = collectDatesFromContainer('new-scene-dates');
+  const memo = document.getElementById('new-scene-memo').value.trim();
 
   const movie = movies.find(m => m.id === currentMovieId);
   const newCostumes = collectItemsFromDOM('new-costume-list');
