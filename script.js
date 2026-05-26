@@ -384,8 +384,6 @@ function showViewUI(viewId) {
 }
 
 window.toggleEditorMode = function() {
-  const wasEditorMode = isEditorMode;
-
   if (isEditorMode) {
     isEditorMode = false;
     document.body.classList.remove('editor-mode');
@@ -413,18 +411,11 @@ window.toggleEditorMode = function() {
 
   if (currentHash.startsWith('search/')) {
     renderSearchResults();
-  } 
-  else if (currentHash.startsWith('daily/')) {
+  } else if (currentHash.startsWith('daily/')) {
     const dateStr = currentHash.split('/')[1];
     executeGoDaily(dateStr, true);
-  } 
-  else if (currentHash.startsWith('movie/') && currentMovieId) {
+  } else if (currentMovieId) {
     renderMovie();
-  } 
-  else {
-    if (currentMovieId) {
-      renderMovie();
-    }
   }
 };
 async function saveMovie(movie) { await setDoc(doc(db, "movies", movie.id.toString()), movie); }
@@ -1012,7 +1003,7 @@ function createSceneCard(scene, forceMovieId = null) {
 
   let html = `<div class="scene-card-header">`;
 
-  if (isEditorMode) {
+if (isEditorMode) {
   const isShot = scene.status === '撮影済み';
   html += `
     <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
@@ -1031,12 +1022,12 @@ function createSceneCard(scene, forceMovieId = null) {
       </label>
     </div>
   `;
+} 
+else if (scene.status === '撮影済み') {
+  html += `<div style="text-align:right; margin-bottom:4px;">
+    <span class="status-color status-使用済み" style="font-size:11px; padding:1px 6px;">撮影済み</span>
+  </div>`;
 }
-  else if (!forceMovieId && isEditorMode === false && scene.status === '撮影済み') {
-    html += `<div style="text-align:right; margin-bottom:4px;">
-      <span class="status-color status-使用済み" style="font-size:11px; padding:1px 6px;">撮影済み</span>
-    </div>`;
-  }
 
   html += `<div class="scene-content">`;
   html += `<strong>シーン ${scene.number}</strong>`;
