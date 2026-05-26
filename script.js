@@ -84,6 +84,11 @@ function migrateSceneData(scene) {
   }
   if (!scene.memo) scene.memo = '';
   if (!scene.status) scene.status = '未撮影';
+
+  // 🌟 使用済みを完全に廃止し、過去の「使用済み」を「準備完了」に戻す魔法です！
+  scene.costumes.forEach(c => { if(c.status === '使用済み') c.status = '準備完了'; });
+  scene.props.forEach(p => { if(p.status === '使用済み') p.status = '準備完了'; });
+
   return scene;
 }
 
@@ -201,7 +206,7 @@ window.closeSceneDetail = () => {
     window.location.hash = `daily/${dateStr}`;
   } 
   else if (previousView === 'search') {
-    executeGoSearch(currentMovieId, false, true); // preserveFilters = true
+    executeGoSearch(currentMovieId, false, true); 
     setTimeout(() => {
       restoreSearchFilters();
     }, 40);
@@ -226,7 +231,7 @@ function restoreSearchFilters() {
   if (cosSel) cosSel.value = lastSearchFilters.costume || '';
   if (propSel) propSel.value = lastSearchFilters.prop || '';
 
-  renderSearchResults();
+  window.renderSearchResults();
 }
 
 function executeGoHome(isDataUpdate) {
@@ -253,7 +258,7 @@ function executeGoMovie(mId, isDataUpdate) {
   if(!isDataUpdate && renderedMovieId !== currentMovieId) {
     document.getElementById('new-scene-dates').innerHTML = '';
     window.addDateInput('new-scene-dates');
-    setViewMode('list');
+    window.setViewMode('list');
     populateSearchFilters();
     renderMovie();
   } else if (isDataUpdate) {
@@ -316,10 +321,10 @@ function executeGoSearch(mId, isDataUpdate = false, preserveFilters = false) {
   populateSearchFilters();
 
   if (!isDataUpdate && !preserveFilters) {
-    clearSearch(false);
+    window.clearSearch(false);
   }
 
-  renderSearchResults();
+  window.renderSearchResults();
   showViewUI('view-search');
 }
 
@@ -410,7 +415,7 @@ window.toggleEditorMode = function() {
   const currentHash = window.location.hash.replace('#', '');
 
   if (currentHash.startsWith('search/')) {
-    renderSearchResults();
+    window.renderSearchResults();
   } 
   else if (currentHash.startsWith('daily/')) {
     const dateStr = currentHash.split('/')[1];
@@ -457,8 +462,8 @@ window.addDateInput = function(containerId, initDate = null) {
   const div = document.createElement('div');
   div.style = 'display: flex; gap: 8px; margin-bottom: 8px; align-items: center;';
   div.innerHTML = `
-    <input type="date" class="native-date-input" value="${initDate || ''}" onchange="checkSceneInput()">
-    <button type="button" class="item-remove-btn" style="position:static; padding:4px 8px;" onclick="this.parentElement.remove(); checkSceneInput();" title="消す">✕</button>
+    <input type="date" class="native-date-input" value="${initDate || ''}" onchange="window.checkSceneInput()">
+    <button type="button" class="item-remove-btn" style="position:static; padding:4px 8px;" onclick="this.parentElement.remove(); window.checkSceneInput();" title="消す">✕</button>
   `;
   container.appendChild(div);
 };
@@ -588,18 +593,17 @@ window.exportToExcel = function() {
   XLSX.writeFile(wb, `${movie.title}_シーン一覧.xlsx`);
 };
 
+// 🌟 使用済みの判定をなくして、すべて準備完了ならOKになるようにしました！
 function getSceneOverallStatus(scene) {
   const items = [...(scene.costumes || []), ...(scene.props || [])];
   if(items.length === 0) return 'none'; 
-  let hasAlert = false, allUsed = true, allReadyOrUsed = true;
+  let hasAlert = false, allReady = true;
   items.forEach(i => {
     if(i.status === '未着手' || i.status === '準備中') hasAlert = true;
-    if(i.status !== '使用済み') allUsed = false;
-    if(i.status !== '準備完了' && i.status !== '使用済み') allReadyOrUsed = false;
+    if(i.status !== '準備完了') allReady = false;
   });
   if(hasAlert) return 'alert';       
-  if(allUsed) return 'used';         
-  if(allReadyOrUsed) return 'ready'; 
+  if(allReady) return 'ready'; 
   return 'none';
 }
 
@@ -609,9 +613,9 @@ function renderGlobalCalendar() {
   const header = document.createElement('div');
   header.className = 'cal-header';
   header.innerHTML = `
-    <button onclick="changeGlobalCalMonth(-1)">&lt; 前月</button>
+    <button onclick="window.changeGlobalCalMonth(-1)">&lt; 前月</button>
     <strong>${globalCalYear}年 ${globalCalMonth + 1}月</strong>
-    <button onclick="changeGlobalCalMonth(1)">次月 &gt;</button>
+    <button onclick="window.changeGlobalCalMonth(1)">次月 &gt;</button>
   `;
   container.appendChild(header);
 
@@ -654,7 +658,9 @@ function renderGlobalCalendar() {
       dotContainer.style = 'display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-start; margin-top:4px;';
 
       dayScenes.forEach(item => {
-        const overall = getSceneOverallStatus(item.scene);
+        let overall = getSceneOverallStatus(item.scene);
+        if (item.scene.status === '撮影済み') overall = 'used'; // 撮影済みなら青色に！
+        
         const dot = document.createElement('span');
         dot.className = `cal-status-circle cal-bg-${overall}`;
         dotContainer.appendChild(dot);
@@ -694,7 +700,7 @@ function renderHome() {
     let detailText = `${movie.scenes.length}件のシーン`;
     if(movie.director) detailText += ` ｜ 監督: ${movie.director}`;
     if(movie.year) detailText += ` ｜ ${movie.year}年`;
-    let editBtnHtml = isEditorMode ? `<button class="edit-title-btn" onclick="event.stopPropagation(); window.goMovieDetails(${movie.id})">編集</button>` : '';
+    let editBtnHtml = `<button class="edit-title-btn editor-only" onclick="event.stopPropagation(); window.goMovieDetails(${movie.id})">編集</button>`;
     const icon = movie.icon || '🎬';
 
     div.innerHTML = `
@@ -723,6 +729,7 @@ window.checkSceneInput = function() {
   btn.disabled = (num === '');
 };
 
+// 🌟 プルダウンから「使用済み」を完全に消し去りました！
 function createItemInputHTML(type, item = null) {
   const id = item ? item.id : Date.now() + Math.random().toString(36).substring(2,7);
   const status = item ? item.status : '未着手';
@@ -735,22 +742,22 @@ function createItemInputHTML(type, item = null) {
   div.dataset.id = id;
   
   div.innerHTML = `
-    <button type="button" class="item-remove-btn" onclick="this.closest('.item-input-block').remove()" title="この枠を消す">✕</button>
-    <select class="item-status status-color status-${status}" onchange="updateSelectColor(this)">
-      <option value="未着手" ${status==='未着手'?'selected':''}>未着手</option>
-      <option value="準備中" ${status==='準備中'?'selected':''}>準備中</option>
-      <option value="準備完了" ${status==='準備完了'?'selected':''}>準備完了</option>
+    <button type=\"button\" class=\"item-remove-btn\" onclick=\"this.closest('.item-input-block').remove()\" title=\"この枠を消す\">✕</button>
+    <select class=\"item-status status-color status-${status}\" onchange=\"window.updateSelectColor(this)\">
+      <option value=\"未着手\" ${status==='未着手'?'selected':''}>未着手</option>
+      <option value=\"準備中\" ${status==='準備中'?'selected':''}>準備中</option>
+      <option value=\"準備完了\" ${status==='準備完了'?'selected':''}>準備完了</option>
     </select>
     
-    <div style="margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;">${type==='costume'?'衣装名':'小道具名'}</div>
-    <input type="text" class="item-name" placeholder="${type==='costume'?'例: スーツ':'例: スマホ'}" value="${name}" oninput="showSuggestions(this, '${type}')">
-    <div class="suggestion-container"></div>
+    <div style=\"margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;\">${type==='costume'?'衣装名':'小道具名'}</div>
+    <input type=\"text\" class=\"item-name\" placeholder=\"${type==='costume'?'例: スーツ':'例: スマホ'}\" value=\"${name}\" oninput=\"window.showSuggestions(this, '${type}')\">
+    <div class=\"suggestion-container\"></div>
     
-    <div style="margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;">${type==='costume'?'衣装詳細':'小道具詳細'}</div>
-    <textarea class="item-desc" placeholder="${type==='costume'?'例: ○○さんの私物':'例: なるべく小さいもの'}">${desc}</textarea>
+    <div style=\"margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;\">${type==='costume'?'衣装詳細':'小道具詳細'}</div>
+    <textarea class=\"item-desc\" placeholder=\"${type==='costume'?'例: ○○さんの私物':'例: なるべく小さいもの'}\">${desc}</textarea>
     
-    <div style="margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;">金額/メモ</div>
-    <input type="text" class="item-price" placeholder="例: 1500円" value="${price}">
+    <div style=\"margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;\">金額/メモ</div>
+    <input type=\"text\" class=\"item-price\" placeholder=\"例: 1500円\" value=\"${price}\">
   `;
   return div;
 }
@@ -839,8 +846,8 @@ window.addScene = function() {
   const num = document.getElementById('new-scene-number').value.trim();
   const name = document.getElementById('new-scene-name').value.trim();
   const loc = document.getElementById('new-scene-location').value.trim();
-  const dates = collectDatesFromContainer('new-scene-dates');
   const memo = document.getElementById('new-scene-memo').value.trim();
+  const dates = collectDatesFromContainer('new-scene-dates');
 
   const movie = movies.find(m => m.id === currentMovieId);
   const newCostumes = collectItemsFromDOM('new-costume-list');
@@ -859,6 +866,7 @@ window.addScene = function() {
   document.getElementById('new-scene-number').value = '';
   document.getElementById('new-scene-name').value = '';
   document.getElementById('new-scene-location').value = '';
+  document.getElementById('new-scene-memo').value = '';
   document.getElementById('new-scene-dates').innerHTML = '';
   window.addDateInput('new-scene-dates'); 
   
@@ -995,6 +1003,7 @@ window.setViewMode = function(mode) {
 
 window.updateSort = function(val) { currentSort = val; renderMovie(); };
 
+// 🌟 ここが最強の魔法です！ 編集用と閲覧用の表示を両方作って、CSSで切り替えます！
 function createSceneCard(scene, forceMovieId = null) {
   const div = document.createElement('div');
   div.className = 'card';
@@ -1003,19 +1012,19 @@ function createSceneCard(scene, forceMovieId = null) {
 
   let borderStatus = getSceneOverallStatus(scene);
   if (scene.status === '撮影済み') {
-    borderStatus = 'used';
+    borderStatus = 'used'; // 撮影済みなら青色に！
   }
   div.classList.add(`scene-border-${borderStatus}`);
 
-  let html = `<div class="scene-card-header">`;
-
-if (isEditorMode) {
+  let html = `<div class="scene-card-header" style="flex-direction: column; align-items: stretch;">`;
   const isShot = scene.status === '撮影済み';
+
+  // --- 編集者用 ---
   html += `
-    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-      <input type="checkbox" class="scene-checkbox" 
+    <div class="editor-only" style="display:flex; align-items:center; gap:8px; margin-bottom:4px; width:100%;">
+      ${!forceMovieId ? `<input type="checkbox" class="scene-checkbox" 
              ${selectedSceneIds.has(scene.id) ? 'checked' : ''} 
-             onclick="window.toggleSceneSelection(${scene.id}, this, event)">
+             onclick="window.toggleSceneSelection(${scene.id}, this, event)">` : ''}
       
       <label class="switch-container" style="margin-left:auto; margin-bottom:0;" 
              onclick="event.stopPropagation();">
@@ -1028,14 +1037,17 @@ if (isEditorMode) {
       </label>
     </div>
   `;
-} 
-else if (scene.status === '撮影済み') {
-  html += `<div style="text-align:right; margin-bottom:4px;">
-    <span class="status-color status-使用済み" style="font-size:11px; padding:1px 6px;">撮影済み</span>
-  </div>`;
-}
 
-  html += `<div class="scene-content">`;
+  // --- 閲覧者用 ---
+  html += `
+    <div class="viewer-only" style="width:100%; text-align:right; margin-bottom:4px;">
+      <span class="status-color ${isShot ? 'status-使用済み' : 'status-未着手'}" style="font-size:11px; padding:1px 6px; border-radius: 4px; display:inline-block; border: 1px solid;">
+        ${isShot ? '撮影済み' : '未撮影'}
+      </span>
+    </div>
+  `;
+
+  html += `<div class="scene-content" style="width:100%;">`;
   html += `<strong>シーン ${scene.number}</strong>`;
   if(scene.sceneName) html += ` ｜ ${scene.sceneName}`;
   if(scene.location) html += ` ｜ ${scene.location}`;
@@ -1075,7 +1087,7 @@ function renderInventory(movie, listContainer, typeKey) {
   let uniqueNames = getUniqueItemNames(movie, typeKey);
   
   if(uniqueNames.length === 0) {
-    listContainer.innerHTML = '<p class="scene-info">まだ登録されていません</p>';
+    listContainer.innerHTML = '<p class="scene-info">まだ登録されていません。</p>';
     return;
   }
 
@@ -1149,7 +1161,6 @@ window.toggleSceneShotStatus = async function(sceneId, checkbox, forceMovieId, e
 
   const movie = movies.find(m => m.id === movieId);
   if (!movie) {
-    console.error('映画が見つかりません', movieId);
     return;
   }
 
@@ -1162,7 +1173,7 @@ window.toggleSceneShotStatus = async function(sceneId, checkbox, forceMovieId, e
 
   const currentHash = window.location.hash.replace('#', '');
   if (currentHash.startsWith('search/')) {
-    renderSearchResults();
+    window.renderSearchResults();
   } else if (currentHash.startsWith('daily/')) {
     const dateStr = currentHash.split('/')[1];
     executeGoDaily(dateStr, true);
@@ -1231,7 +1242,7 @@ function renderMovie() {
   list.innerHTML = '';
 
   if(!movie || movie.scenes.length === 0) {
-    list.innerHTML = '<p class="scene-info">まだシーンがありません</p>';
+    list.innerHTML = '<p class="scene-info">まだシーンがありません。</p>';
     list.style.minHeight = '';
     return;
   }
@@ -1279,19 +1290,19 @@ function renderSceneViewDetail() {
   let infoText = `場所: ${scene.location || '未定'} ｜ 撮影日: ${dateText}`;
   document.getElementById('view-scene-info').textContent = infoText;
   const memoArea = document.getElementById('view-scene-memo');
-if (memoArea) {
-  if (scene.memo) {
-    memoArea.innerHTML = `
-      <strong>メモ</strong><br>
-      <div style="white-space: pre-wrap; background: rgba(0,0,0,0.03); padding: 8px; border-radius: 4px; word-break: break-all;">
-        ${linkify(scene.memo)}
-      </div>
-    `;
-    memoArea.style.display = 'block';
-  } else {
-    memoArea.style.display = 'none';
+  if (memoArea) {
+    if (scene.memo) {
+      memoArea.innerHTML = `
+        <strong>メモ・備考</strong><br>
+        <div style="white-space: pre-wrap; background: rgba(0,0,0,0.03); padding: 8px; border-radius: 4px; word-break: break-all;">
+          ${linkify(scene.memo)}
+        </div>
+      `;
+      memoArea.style.display = 'block';
+    } else {
+      memoArea.style.display = 'none';
+    }
   }
-}
 
   const cList = document.getElementById('view-scene-costumes');
   cList.innerHTML = '';
