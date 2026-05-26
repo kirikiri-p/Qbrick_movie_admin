@@ -384,6 +384,8 @@ function showViewUI(viewId) {
 }
 
 window.toggleEditorMode = function() {
+  const wasEditorMode = isEditorMode;
+
   if (isEditorMode) {
     isEditorMode = false;
     document.body.classList.remove('editor-mode');
@@ -408,10 +410,21 @@ window.toggleEditorMode = function() {
   renderHome();
 
   const currentHash = window.location.hash.replace('#', '');
+
   if (currentHash.startsWith('search/')) {
     renderSearchResults();
-  } else if (currentHash.startsWith('movie/') && currentMovieId) {
+  } 
+  else if (currentHash.startsWith('daily/')) {
+    const dateStr = currentHash.split('/')[1];
+    executeGoDaily(dateStr, true);
+  } 
+  else if (currentHash.startsWith('movie/') && currentMovieId) {
     renderMovie();
+  } 
+  else {
+    if (currentMovieId) {
+      renderMovie();
+    }
   }
 };
 async function saveMovie(movie) { await setDoc(doc(db, "movies", movie.id.toString()), movie); }
