@@ -411,11 +411,16 @@ window.toggleEditorMode = function() {
 
   if (currentHash.startsWith('search/')) {
     renderSearchResults();
-  } else if (currentHash.startsWith('daily/')) {
+  } 
+  else if (currentHash.startsWith('daily/')) {
     const dateStr = currentHash.split('/')[1];
     executeGoDaily(dateStr, true);
-  } else if (currentMovieId) {
+  } 
+  else if (currentMovieId) {
     renderMovie();
+  } 
+  else {
+    renderHome();
   }
 };
 async function saveMovie(movie) { await setDoc(doc(db, "movies", movie.id.toString()), movie); }
