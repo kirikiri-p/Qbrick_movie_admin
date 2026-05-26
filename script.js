@@ -22,6 +22,7 @@ let currentViewMode = 'list';
 let currentSort = 'num-asc'; 
 let selectedSceneIds = new Set(); 
 let lastViewHash = 'home'; 
+let previousView = 'movie';
 
 let renderedMovieId = null;
 let renderedDailyDate = null;
@@ -127,7 +128,6 @@ function handleHash(isDataUpdate = false) {
     if (parts.length === 2) {
       executeGoSearch(parseInt(parts[1]), isDataUpdate, true);
     } else if (parts[2] === 'scene') {
-      // 🌟 検索結果からシーンを開く専用の処理を呼び出します！
       executeGoSearchScene(parseInt(parts[3]), parseInt(parts[1]), isDataUpdate);
     }
   } else if (hash.startsWith('details/')) {
@@ -157,18 +157,15 @@ window.goMovie = (id) => { window.location.hash = 'movie/' + id; };
 window.showDailyScenes = (dateStr) => { window.location.hash = `daily/${dateStr}`; };
 window.goMovieDetails = (id) => { window.location.hash = 'details/' + id; };
 
-// 🌟 検索画面へ行く時はフィルタをリセットします！
 window.goSearch = () => { 
   lastSearchFilters = { number: '', location: '', date: '', costume: '', prop: '' };
   window.location.hash = 'search/' + currentMovieId; 
 };
 
-// 🌟 URLハッシュを書き換えるだけで、あとは全て handleHash にお任せします！
 window.goScene = (sId, forceMovieId) => {
   const currentHash = window.location.hash.replace('#', '');
   
   if (currentHash.startsWith('search/')) {
-    // 検索画面から開く時は、開く前に今の検索条件を保存しておきます！
     lastSearchFilters.number = document.getElementById('search-number')?.value || '';
     lastSearchFilters.location = document.getElementById('search-location')?.value || '';
     lastSearchFilters.date = document.getElementById('search-date')?.value || '';
@@ -238,6 +235,9 @@ function executeGoMovie(mId, isDataUpdate) {
   selectedSceneIds.clear();
   document.getElementById('bulk-delete-btn').classList.add('hidden');
   
+  // 🌟 移動してきたら、右半分の枠組みを確実にお片付けします！
+  document.getElementById('movie-detail-container')?.classList.remove('has-detail');
+
   const movie = movies.find(m => m.id === currentMovieId);
   if(!movie) return;
   document.getElementById('header-movie-title-nav').classList.remove('hidden');
@@ -297,14 +297,16 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   } else if (!isDataUpdate) {
     renderSceneEditDetail();
   }
+  
+  // 🌟 ここで「半分こ」になる魔法のスイッチを入れます！
   detailPane.classList.add('show-detail');
   detailPane.closest('.detail-pane-container')?.classList.add('has-detail');
+  
   if (window.innerWidth < 800) {
     document.body.style.overflow = 'hidden';
   }
 }
 
-// 🌟 検索結果から詳細を開く時の専用の魔法です！
 function executeGoSearchScene(sId, mId, isDataUpdate) {
   currentMovieId = mId;
   currentSceneId = sId;
@@ -312,7 +314,6 @@ function executeGoSearchScene(sId, mId, isDataUpdate) {
   if (!movie) return;
 
   const detailPane = document.getElementById('detail-pane');
-  // 検索画面の右側に詳細画面をはめ込みます！
   document.getElementById('search-detail-container').appendChild(detailPane);
 
   if (!isDataUpdate) {
@@ -333,6 +334,7 @@ function executeGoSearchScene(sId, mId, isDataUpdate) {
 
   detailPane.classList.add('show-detail');
   detailPane.closest('.detail-pane-container')?.classList.add('has-detail');
+  
   if (window.innerWidth < 800) {
     document.body.style.overflow = 'hidden';
   }
@@ -343,10 +345,10 @@ function executeGoSearch(mId, isDataUpdate = false, preserveFilters = false) {
   document.body.style.overflow = '';
   currentMovieId = mId;
   
-  // 検索一覧に戻った時は詳細を隠します
+  // 🌟 検索画面に戻った時は、お片付けして画面を広げます！
   const detailPane = document.getElementById('detail-pane');
   detailPane.classList.remove('show-detail');
-  detailPane.closest('.detail-pane-container')?.classList.remove('has-detail');
+  document.getElementById('search-detail-container')?.classList.remove('has-detail');
   currentSceneId = null;
 
   populateSearchFilters();
@@ -378,6 +380,10 @@ function executeGoMovieDetails(mId, isDataUpdate) {
 function executeGoDaily(dateStr, isDataUpdate, skipRenderIfLoaded = false) {
   document.body.style.overflow = '';
   renderedDailyDate = dateStr;
+  
+  // 🌟 カレンダーに戻った時も、お片付けして画面を広げます！
+  document.getElementById('daily-detail-container')?.classList.remove('has-detail');
+
   document.getElementById('header-movie-title-nav').classList.remove('hidden');
   document.getElementById('header-title-sub').textContent = `${dateStr} の予定`;
   document.getElementById('header-main-title').textContent = `${dateStr} の撮影予定`;
