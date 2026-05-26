@@ -22,7 +22,6 @@ let currentViewMode = 'list';
 let currentSort = 'num-asc'; 
 let selectedSceneIds = new Set(); 
 let lastViewHash = 'home'; 
-let previousView = 'movie';
 
 let renderedMovieId = null;
 let renderedDailyDate = null;
@@ -32,11 +31,7 @@ let globalCalYear = new Date().getFullYear();
 let globalCalMonth = new Date().getMonth();
 
 let lastSearchFilters = {
-  number: '',
-  location: '',
-  date: '',
-  costume: '',
-  prop: ''
+  number: '', location: '', date: '', costume: '', prop: ''
 };
 
 let isDarkMode = false;
@@ -68,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if(excelUpload) excelUpload.addEventListener('change', handleExcelUpload);
 
   document.querySelectorAll('#search-number, #search-location, #search-date, #search-costume, #search-prop').forEach(el => {
-    el.addEventListener('change', renderSearchResults);
+    el.addEventListener('change', window.renderSearchResults);
   });
 });
 
@@ -85,7 +80,6 @@ function migrateSceneData(scene) {
   if (!scene.memo) scene.memo = '';
   if (!scene.status) scene.status = '未撮影';
 
-  // 🌟 使用済みを完全に廃止し、過去の「使用済み」を「準備完了」に戻す魔法です！
   scene.costumes.forEach(c => { if(c.status === '使用済み') c.status = '準備完了'; });
   scene.props.forEach(p => { if(p.status === '使用済み') p.status = '準備完了'; });
 
@@ -129,7 +123,13 @@ function handleHash(isDataUpdate = false) {
       executeGoScene(parseInt(parts[4]), parseInt(parts[3]), parts[1], isDataUpdate);
     }
   } else if (hash.startsWith('search/')) {
-    executeGoSearch(parseInt(hash.split('/')[1]), isDataUpdate);
+    const parts = hash.split('/');
+    if (parts.length === 2) {
+      executeGoSearch(parseInt(parts[1]), isDataUpdate, true);
+    } else if (parts[2] === 'scene') {
+      // 🌟 検索結果からシーンを開く専用の処理を呼び出します！
+      executeGoSearchScene(parseInt(parts[3]), parseInt(parts[1]), isDataUpdate);
+    }
   } else if (hash.startsWith('details/')) {
     executeGoMovieDetails(parseInt(hash.split('/')[1]), isDataUpdate);
   }
@@ -154,35 +154,29 @@ onSnapshot(moviesRef, (snapshot) => {
 
 window.goHome = () => { window.location.hash = 'home'; };
 window.goMovie = (id) => { window.location.hash = 'movie/' + id; };
-window.goSearch = () => { window.location.hash = 'search/' + currentMovieId; };
-window.goMovieDetails = (id) => { window.location.hash = 'details/' + id; };
 window.showDailyScenes = (dateStr) => { window.location.hash = `daily/${dateStr}`; };
+window.goMovieDetails = (id) => { window.location.hash = 'details/' + id; };
 
+// 🌟 検索画面へ行く時はフィルタをリセットします！
+window.goSearch = () => { 
+  lastSearchFilters = { number: '', location: '', date: '', costume: '', prop: '' };
+  window.location.hash = 'search/' + currentMovieId; 
+};
+
+// 🌟 URLハッシュを書き換えるだけで、あとは全て handleHash にお任せします！
 window.goScene = (sId, forceMovieId) => {
   const currentHash = window.location.hash.replace('#', '');
   
   if (currentHash.startsWith('search/')) {
-    previousView = 'search';
-    currentMovieId = forceMovieId || currentMovieId;
-    currentSceneId = sId;
-
+    // 検索画面から開く時は、開く前に今の検索条件を保存しておきます！
     lastSearchFilters.number = document.getElementById('search-number')?.value || '';
     lastSearchFilters.location = document.getElementById('search-location')?.value || '';
     lastSearchFilters.date = document.getElementById('search-date')?.value || '';
     lastSearchFilters.costume = document.getElementById('search-costume')?.value || '';
     lastSearchFilters.prop = document.getElementById('search-prop')?.value || '';
-
-    executeGoScene(sId, currentMovieId, null, false);
-    return;
-  }
-
-  if (currentHash.startsWith('daily/')) {
-    previousView = 'daily';
-  } else {
-    previousView = 'movie';
-  }
-
-  if (currentHash.startsWith('daily/')) {
+    
+    window.location.hash = `search/${forceMovieId || currentMovieId}/scene/${sId}`;
+  } else if (currentHash.startsWith('daily/')) {
     const dateStr = currentHash.split('/')[1];
     window.location.hash = `daily/${dateStr}/scene/${forceMovieId || currentMovieId}/${sId}`;
   } else {
@@ -205,16 +199,11 @@ window.closeSceneDetail = () => {
     const dateStr = currentHash.split('/')[1];
     window.location.hash = `daily/${dateStr}`;
   } 
-  else if (previousView === 'search') {
-    executeGoSearch(currentMovieId, false, true); 
-    setTimeout(() => {
-      restoreSearchFilters();
-    }, 40);
-    previousView = 'movie';
+  else if (currentHash.startsWith('search/')) {
+    window.location.hash = `search/${currentMovieId}`;
   } 
   else {
     window.location.hash = `movie/${currentMovieId}`;
-    previousView = 'movie';
   }
 };
 
@@ -315,16 +304,59 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   }
 }
 
+// 🌟 検索結果から詳細を開く時の専用の魔法です！
+function executeGoSearchScene(sId, mId, isDataUpdate) {
+  currentMovieId = mId;
+  currentSceneId = sId;
+  const movie = movies.find(m => m.id === currentMovieId);
+  if (!movie) return;
+
+  const detailPane = document.getElementById('detail-pane');
+  // 検索画面の右側に詳細画面をはめ込みます！
+  document.getElementById('search-detail-container').appendChild(detailPane);
+
+  if (!isDataUpdate) {
+    populateSearchFilters();
+    restoreSearchFilters(); 
+  }
+
+  if (!isDataUpdate) {
+    document.getElementById('detail-pane-edit').classList.add('hidden');
+    document.getElementById('detail-pane-view').classList.remove('hidden');
+  }
+
+  if (document.getElementById('detail-pane-edit').classList.contains('hidden')) {
+    renderSceneViewDetail();
+  } else if (!isDataUpdate) {
+    renderSceneEditDetail();
+  }
+
+  detailPane.classList.add('show-detail');
+  detailPane.closest('.detail-pane-container')?.classList.add('has-detail');
+  if (window.innerWidth < 800) {
+    document.body.style.overflow = 'hidden';
+  }
+  showViewUI('view-search');
+}
+
 function executeGoSearch(mId, isDataUpdate = false, preserveFilters = false) {
   document.body.style.overflow = '';
   currentMovieId = mId;
+  
+  // 検索一覧に戻った時は詳細を隠します
+  const detailPane = document.getElementById('detail-pane');
+  detailPane.classList.remove('show-detail');
+  detailPane.closest('.detail-pane-container')?.classList.remove('has-detail');
+  currentSceneId = null;
+
   populateSearchFilters();
 
   if (!isDataUpdate && !preserveFilters) {
     window.clearSearch(false);
+  } else {
+    restoreSearchFilters();
   }
 
-  window.renderSearchResults();
   showViewUI('view-search');
 }
 
@@ -593,7 +625,6 @@ window.exportToExcel = function() {
   XLSX.writeFile(wb, `${movie.title}_シーン一覧.xlsx`);
 };
 
-// 🌟 使用済みの判定をなくして、すべて準備完了ならOKになるようにしました！
 function getSceneOverallStatus(scene) {
   const items = [...(scene.costumes || []), ...(scene.props || [])];
   if(items.length === 0) return 'none'; 
@@ -659,7 +690,7 @@ function renderGlobalCalendar() {
 
       dayScenes.forEach(item => {
         let overall = getSceneOverallStatus(item.scene);
-        if (item.scene.status === '撮影済み') overall = 'used'; // 撮影済みなら青色に！
+        if (item.scene.status === '撮影済み') overall = 'used'; 
         
         const dot = document.createElement('span');
         dot.className = `cal-status-circle cal-bg-${overall}`;
@@ -729,7 +760,6 @@ window.checkSceneInput = function() {
   btn.disabled = (num === '');
 };
 
-// 🌟 プルダウンから「使用済み」を完全に消し去りました！
 function createItemInputHTML(type, item = null) {
   const id = item ? item.id : Date.now() + Math.random().toString(36).substring(2,7);
   const status = item ? item.status : '未着手';
@@ -742,22 +772,22 @@ function createItemInputHTML(type, item = null) {
   div.dataset.id = id;
   
   div.innerHTML = `
-    <button type=\"button\" class=\"item-remove-btn\" onclick=\"this.closest('.item-input-block').remove()\" title=\"この枠を消す\">✕</button>
-    <select class=\"item-status status-color status-${status}\" onchange=\"window.updateSelectColor(this)\">
-      <option value=\"未着手\" ${status==='未着手'?'selected':''}>未着手</option>
-      <option value=\"準備中\" ${status==='準備中'?'selected':''}>準備中</option>
-      <option value=\"準備完了\" ${status==='準備完了'?'selected':''}>準備完了</option>
+    <button type="button" class="item-remove-btn" onclick="this.closest('.item-input-block').remove()" title="この枠を消す">✕</button>
+    <select class="item-status status-color status-${status}" onchange="window.updateSelectColor(this)">
+      <option value="未着手" ${status==='未着手'?'selected':''}>未着手</option>
+      <option value="準備中" ${status==='準備中'?'selected':''}>準備中</option>
+      <option value="準備完了" ${status==='準備完了'?'selected':''}>準備完了</option>
     </select>
     
-    <div style=\"margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;\">${type==='costume'?'衣装名':'小道具名'}</div>
-    <input type=\"text\" class=\"item-name\" placeholder=\"${type==='costume'?'例: スーツ':'例: スマホ'}\" value=\"${name}\" oninput=\"window.showSuggestions(this, '${type}')\">
-    <div class=\"suggestion-container\"></div>
+    <div style="margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;">${type==='costume'?'衣装名':'小道具名'}</div>
+    <input type="text" class="item-name" placeholder="${type==='costume'?'例: スーツ':'例: スマホ'}" value="${name}" oninput="window.showSuggestions(this, '${type}')">
+    <div class="suggestion-container"></div>
     
-    <div style=\"margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;\">${type==='costume'?'衣装詳細':'小道具詳細'}</div>
-    <textarea class=\"item-desc\" placeholder=\"${type==='costume'?'例: ○○さんの私物':'例: なるべく小さいもの'}\">${desc}</textarea>
+    <div style="margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;">${type==='costume'?'衣装詳細':'小道具詳細'}</div>
+    <textarea class="item-desc" placeholder="${type==='costume'?'例: ○○さんの私物':'例: なるべく小さいもの'}">${desc}</textarea>
     
-    <div style=\"margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;\">金額/メモ</div>
-    <input type=\"text\" class=\"item-price\" placeholder=\"例: 1500円\" value=\"${price}\">
+    <div style="margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;">金額/メモ</div>
+    <input type="text" class="item-price" placeholder="例: 1500円" value="${price}">
   `;
   return div;
 }
@@ -1003,7 +1033,6 @@ window.setViewMode = function(mode) {
 
 window.updateSort = function(val) { currentSort = val; renderMovie(); };
 
-// 🌟 ここが最強の魔法です！ 編集用と閲覧用の表示を両方作って、CSSで切り替えます！
 function createSceneCard(scene, forceMovieId = null) {
   const div = document.createElement('div');
   div.className = 'card';
@@ -1012,14 +1041,13 @@ function createSceneCard(scene, forceMovieId = null) {
 
   let borderStatus = getSceneOverallStatus(scene);
   if (scene.status === '撮影済み') {
-    borderStatus = 'used'; // 撮影済みなら青色に！
+    borderStatus = 'used'; 
   }
   div.classList.add(`scene-border-${borderStatus}`);
 
   let html = `<div class="scene-card-header" style="flex-direction: column; align-items: stretch;">`;
   const isShot = scene.status === '撮影済み';
 
-  // --- 編集者用 ---
   html += `
     <div class="editor-only" style="display:flex; align-items:center; gap:8px; margin-bottom:4px; width:100%;">
       ${!forceMovieId ? `<input type="checkbox" class="scene-checkbox" 
@@ -1038,7 +1066,6 @@ function createSceneCard(scene, forceMovieId = null) {
     </div>
   `;
 
-  // --- 閲覧者用 ---
   html += `
     <div class="viewer-only" style="width:100%; text-align:right; margin-bottom:4px;">
       <span class="status-color ${isShot ? 'status-使用済み' : 'status-未着手'}" style="font-size:11px; padding:1px 6px; border-radius: 4px; display:inline-block; border: 1px solid;">
