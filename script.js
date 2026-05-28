@@ -235,7 +235,6 @@ function executeGoMovie(mId, isDataUpdate) {
   selectedSceneIds.clear();
   document.getElementById('bulk-delete-btn').classList.add('hidden');
   
-  // 🌟 移動してきたら、右半分の枠組みを確実にお片付けします！
   document.getElementById('movie-detail-container')?.classList.remove('has-detail');
 
   const movie = movies.find(m => m.id === currentMovieId);
@@ -298,7 +297,6 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
     renderSceneEditDetail();
   }
   
-  // 🌟 ここで「半分こ」になる魔法のスイッチを入れます！
   detailPane.classList.add('show-detail');
   detailPane.closest('.detail-pane-container')?.classList.add('has-detail');
   
