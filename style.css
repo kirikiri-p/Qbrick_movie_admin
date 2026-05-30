@@ -136,6 +136,10 @@ body.dark-mode .cal-bg-ready { background-color: #66bb6a; }
 body.dark-mode .cal-bg-used { background-color: #42a5f5; }
 body.dark-mode .cal-bg-none { border-color: #666; }
 
+/* 🌟 時間帯バッジの可愛いスタイルです */
+.time-zone-badge { display: inline-block; padding: 2px 8px; font-size: 12px; font-weight: bold; background: #e0e0e0; color: #333; border-radius: 4px; text-align: center; }
+body.dark-mode .time-zone-badge { background: #444; color: #fff; }
+
 .scene-card-header { display: flex; align-items: flex-start; gap: 8px; }
 .scene-checkbox { margin-top: 4px; transform: scale(1.2); cursor: pointer; }
 .scene-content { flex: 1; }
@@ -192,7 +196,7 @@ body.dark-mode .view-toggles button.active { background-color: #333; color: #fff
 .detail-pane { display: none; flex: 1; min-height: 0; overflow-y: auto; padding-right: 8px;}
 .detail-pane.show-detail { display: block; animation: nyoki 0.2s ease-out forwards; }
 .detail-pane::-webkit-scrollbar { width: 8px; }
-.detail-pane::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 0; border: 1px solid var(--bg-color);}
+.detail-pane::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 0; border: 1px solid var(--bg-color); }
 
 @media (max-width: 799px) {
   .split-layout { flex-direction: column; }

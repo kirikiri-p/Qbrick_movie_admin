@@ -31,6 +31,9 @@ let isEditorMode = false;
 let globalCalYear = new Date().getFullYear();
 let globalCalMonth = new Date().getMonth();
 
+// 🌟 衣装・小道具一覧のアコーディオンが開いている名前を記憶するセットです！
+let openedAccordionNames = new Set();
+
 let lastSearchFilters = {
   number: '', location: '', date: '', costume: '', prop: ''
 };
@@ -80,6 +83,8 @@ function migrateSceneData(scene) {
   }
   if (!scene.memo) scene.memo = '';
   if (!scene.status) scene.status = '未撮影';
+  if (!scene.timeZone) scene.timeZone = 'D'; // 🌟 デフォルトはD（昼間）
+  if (!scene.updatedAt) scene.updatedAt = ''; // 🌟 最終更新日時用
 
   scene.costumes.forEach(c => { if(c.status === '使用済み') c.status = '準備完了'; });
   scene.props.forEach(p => { if(p.status === '使用済み') p.status = '準備完了'; });
@@ -93,6 +98,18 @@ function linkify(text) {
   return text.replace(urlRegex, url => {
     return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #1976d2; text-decoration: underline;">${url}</a>`;
   });
+}
+
+// 🌟 現在の「年/月/日 時:分:秒」スタンプを作る魔法です！
+function getNowFormattedString() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = ('0' + (now.getMonth() + 1)).slice(-2);
+  const d = ('0' + now.getDate()).slice(-2);
+  const h = ('0' + now.getHours()).slice(-2);
+  const min = ('0' + now.getMinutes()).slice(-2);
+  const s = ('0' + now.getSeconds()).slice(-2);
+  return `${y}/${m}/${d} ${h}:${min}:${s}`;
 }
 
 window.addEventListener('hashchange', (e) => {
@@ -343,7 +360,6 @@ function executeGoSearch(mId, isDataUpdate = false, preserveFilters = false) {
   document.body.style.overflow = '';
   currentMovieId = mId;
   
-  // 🌟 検索画面に戻った時は、お片付けして画面を広げます！
   const detailPane = document.getElementById('detail-pane');
   detailPane.classList.remove('show-detail');
   document.getElementById('search-detail-container')?.classList.remove('has-detail');
@@ -379,7 +395,6 @@ function executeGoDaily(dateStr, isDataUpdate, skipRenderIfLoaded = false) {
   document.body.style.overflow = '';
   renderedDailyDate = dateStr;
   
-  // 🌟 カレンダーに戻った時も、お片付けして画面を広げます！
   document.getElementById('daily-detail-container')?.classList.remove('has-detail');
 
   document.getElementById('header-movie-title-nav').classList.remove('hidden');
@@ -417,10 +432,13 @@ function showViewUI(viewId) {
     if(el) el.classList.add('hidden');
   });
   document.getElementById(viewId).classList.remove('hidden');
-  if(viewId === 'view-movie' || viewId === 'view-search') {
-    document.getElementById('header-search-btn').classList.remove('hidden');
+  
+  // 🌟 検索画面（view-search）にいるときだけ、右上の「検索」ボタンをそっと非表示にします！
+  const searchBtn = document.getElementById('header-search-btn');
+  if (viewId === 'view-movie') {
+    searchBtn?.classList.remove('hidden');
   } else {
-    document.getElementById('header-search-btn').classList.add('hidden');
+    searchBtn?.classList.add('hidden');
   }
 }
 
@@ -592,7 +610,7 @@ window.handleExcelUpload = function(event) {
         if(props.length > 0) existing.props.push(...props);
         dates.forEach(d => { if(!existing.dates.includes(d)) existing.dates.push(d); });
       } else {
-        newScenes.push({ id: Date.now() + index, number: number, dates: dates, sceneName: sceneName, location: location, costumes: costumes, props: props });
+        newScenes.push({ id: Date.now() + index, number: number, dates: dates, sceneName: sceneName, location: location, costumes: costumes, props: props, updatedAt: getNowFormattedString() });
       }
     });
 
@@ -863,6 +881,7 @@ function collectItemsFromDOM(containerId) {
   return items;
 }
 
+// 🌟 名前が一致した時、「ステータス」だけでなく「詳細(desc)」「金額(price)」も完全に同期する魔法です！
 function syncItemStatuses(movie, updatedItems, typeKey) {
   updatedItems.forEach(updatedItem => {
     movie.scenes.forEach(scene => {
@@ -870,16 +889,73 @@ function syncItemStatuses(movie, updatedItems, typeKey) {
       items.forEach(item => {
         if (item.name === updatedItem.name) {
           item.status = updatedItem.status;
+          item.desc = updatedItem.desc;
+          item.price = updatedItem.price;
         }
       });
     });
   });
 }
 
+// 🌟 衣装・小道具一覧から直接中身をいじった時に、データベースへ即時反映する魔法です！
+window.updateInventoryItemField = async function(typeKey, itemName, fieldKey, newValue) {
+  const movie = movies.find(m => m.id === currentMovieId);
+  if (!movie) return;
+
+  movie.scenes.forEach(scene => {
+    const items = scene[typeKey] || [];
+    let isChanged = false;
+    items.forEach(item => {
+      if (item.name === itemName) {
+        item[fieldKey] = newValue;
+        isChanged = true;
+      }
+    });
+    if (isChanged) {
+      scene.updatedAt = getNowFormattedString(); // 自動タイムスタンプ！
+    }
+  });
+
+  await saveMovie(movie);
+};
+
+// 🌟 衣装や小道具の名前を全シーン一斉に書き換えるスーパー魔法です！
+window.renameInventoryItemBulk = async function(typeKey, oldName) {
+  const newName = prompt(`「${oldName}」の新しい名称を入力してください`, oldName);
+  if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+
+  const movie = movies.find(m => m.id === currentMovieId);
+  if (!movie) return;
+
+  movie.scenes.forEach(scene => {
+    const items = scene[typeKey] || [];
+    let isChanged = false;
+    items.forEach(item => {
+      if (item.name === oldName) {
+        item.name = newName.trim();
+        isChanged = true;
+      }
+    });
+    if (isChanged) {
+      scene.updatedAt = getNowFormattedString(); // 自動タイムスタンプ！
+    }
+  });
+
+  // 開いていたアコーディオンの記憶を新しい名前に引き継ぎます
+  if (openedAccordionNames.has(oldName)) {
+    openedAccordionNames.delete(oldName);
+    openedAccordionNames.add(newName.trim());
+  }
+
+  await saveMovie(movie);
+  alert(`「${oldName}」をすべて「${newName.trim()}」に変更しました。`);
+};
+
 window.addScene = function() {
   const num = document.getElementById('new-scene-number').value.trim();
   const name = document.getElementById('new-scene-name').value.trim();
   const loc = document.getElementById('new-scene-location').value.trim();
+  const timeZone = document.getElementById('new-scene-time-zone').value;
   const memo = document.getElementById('new-scene-memo').value.trim();
   const dates = collectDatesFromContainer('new-scene-dates');
 
@@ -889,7 +965,7 @@ window.addScene = function() {
 
   movie.scenes.push({
     id: Date.now(), number: num, sceneName: name, location: loc, memo: memo, dates: dates,
-    costumes: newCostumes, props: newProps
+    timeZone: timeZone, costumes: newCostumes, props: newProps, updatedAt: getNowFormattedString() // 最終更新日時
   });
 
   syncItemStatuses(movie, newCostumes, 'costumes');
@@ -1079,7 +1155,13 @@ function createSceneCard(scene, forceMovieId = null) {
   `;
 
   html += `<div class="scene-content" style="width:100%;">`;
-  html += `<strong>シーン ${scene.number}</strong>`;
+  
+  // 🌟 シーン番号の横にバッジ形式で時間帯（D/N/M/E）を表示します！
+  html += `<div style="display:flex; justify-content:space-between; align-items:center;">
+    <strong>シーン ${scene.number}</strong>
+    <span class="time-zone-badge">${scene.timeZone || 'D'}</span>
+  </div>`;
+  
   if(scene.sceneName) html += ` ｜ ${scene.sceneName}`;
   if(scene.location) html += ` ｜ ${scene.location}`;
   
@@ -1088,6 +1170,11 @@ function createSceneCard(scene, forceMovieId = null) {
     dateText = scene.dates.join(', ');
   }
   html += `<div class="scene-info">撮影日: ${dateText}</div>`;
+  
+  // 🌟 最終更新日時が記録されていたら、カードの下部にも小さく表示します
+  if (scene.updatedAt) {
+    html += `<div class="scene-info" style="font-size:10px; color:var(--muted-text);">最終更新: ${scene.updatedAt}</div>`;
+  }
   
   html += `<div style="margin-top: 8px;">`;
   if(scene.costumes && scene.costumes.length > 0) {
@@ -1102,16 +1189,6 @@ function createSceneCard(scene, forceMovieId = null) {
   div.innerHTML = html;
   div.onclick = () => window.goScene(scene.id, forceMovieId);
   return div;
-}
-
-function getEarliestDate(movie, typeKey, itemName) {
-  const scenes = movie.scenes.filter(s => {
-    const items = (typeKey === 'costumes' ? s.costumes : s.props) || [];
-    return items.some(i => i.name === itemName) && s.dates && s.dates.length > 0;
-  });
-  if(scenes.length === 0) return null;
-  const allDates = scenes.flatMap(s => s.dates).sort();
-  return allDates[0];
 }
 
 function renderInventory(movie, listContainer, typeKey) {
@@ -1146,6 +1223,9 @@ function renderInventory(movie, listContainer, typeKey) {
       return items.some(i => i.name === name);
     });
     
+    // 見本の共通データを取得します
+    const sampleItem = matchingScenes[0][typeKey].find(i => i.name === name) || {};
+    
     let itemStatuses = new Set();
     matchingScenes.forEach(s => {
       const items = (typeKey === 'costumes' ? s.costumes : s.props) || [];
@@ -1160,6 +1240,20 @@ function renderInventory(movie, listContainer, typeKey) {
     const details = document.createElement('details');
     details.className = 'accordion inventory-accordion';
     
+    // 🌟 状態が保存され続けるように、記憶セットに名前があれば最初から開いておきます！
+    if (openedAccordionNames.has(name)) {
+      details.setAttribute('open', 'true');
+    }
+    
+    // 開閉したタイミングを監視してセットに記録します
+    details.addEventListener('toggle', () => {
+      if (details.hasAttribute('open')) {
+        openedAccordionNames.add(name);
+      } else {
+        openedAccordionNames.delete(name);
+      }
+    });
+    
     const summary = document.createElement('summary');
     summary.innerHTML = `
       <div style="display:flex; align-items:flex-start; width:100%;">
@@ -1172,6 +1266,33 @@ function renderInventory(movie, listContainer, typeKey) {
 
     const content = document.createElement('div');
     content.className = 'accordion-content';
+    
+    // 🌟 一覧画面からステータス、詳細、一斉名称変更を即時いじれるUIを組み込みます！
+    const editArea = document.createElement('div');
+    editArea.style = 'background:var(--card-bg); padding:12px; margin-bottom:12px; border:1px solid var(--border-color); font-size:13px;';
+    
+    const st = sampleItem.status || '未着手';
+    editArea.innerHTML = `
+      <div style="margin-bottom:8px;">
+        <strong style="color:var(--accent-color);">[一括管理マネージャー]</strong>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+        <span>ステータス:</span>
+        <select style="width:auto; margin:0; padding:4px 8px;" onchange="window.updateInventoryItemField('${typeKey}', '${name}', 'status', this.value)">
+          <option value="未着手" ${st==='未着手'?'selected':''}>未着手</option>
+          <option value="準備中" ${st==='準備中'?'selected':''}>準備中</option>
+          <option value="準備完了" ${st==='準備完了'?'selected':''}>準備完了</option>
+        </select>
+        
+        <button class="secondary editor-only" style="width:auto; margin:0; padding:4px 8px; font-size:12px; background:var(--text-color); color:var(--bg-color);" onclick="window.renameInventoryItemBulk('${typeKey}', '${name}')">✏️ 名称を一斉変更</button>
+      </div>
+      <div style="margin-bottom:4px;">詳細情報・メモ:</div>
+      <textarea style="margin:0 0 8px 0; font-size:12px; padding:6px;" placeholder="共通の詳細を入力" onchange="window.updateInventoryItemField('${typeKey}', '${name}', 'desc', this.value)">${sampleItem.desc || ''}</textarea>
+      <div style="margin-bottom:4px;">金額/メモ:</div>
+      <input type="text" style="margin:0; font-size:12px; padding:6px;" value="${sampleItem.price || ''}" placeholder="金額やメモを入力" onchange="window.updateInventoryItemField('${typeKey}', '${name}', 'price', this.value)">
+    `;
+    
+    content.appendChild(editArea);
     
     matchingScenes.sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, {numeric: true, sensitivity: 'base'})).forEach(scene => {
       content.appendChild(createSceneCard(scene));
@@ -1191,14 +1312,13 @@ window.toggleSceneShotStatus = async function(sceneId, checkbox, forceMovieId, e
   }
 
   const movie = movies.find(m => m.id === movieId);
-  if (!movie) {
-    return;
-  }
+  if (!movie) return;
 
   const scene = movie.scenes.find(s => s.id === sceneId);
   if (!scene) return;
 
   scene.status = checkbox.checked ? '撮影済み' : '未撮影';
+  scene.updatedAt = getNowFormattedString(); // 最終更新日時を記録！
 
   await saveMovie(movie);
 
@@ -1317,9 +1437,16 @@ function renderSceneViewDetail() {
   if(scene.sceneName) titleText += ` ｜ ${scene.sceneName}`;
   document.getElementById('view-scene-header').textContent = titleText;
   
+  // 🌟 時間帯のテキストバッジを右側にマッピングします
+  document.getElementById('view-scene-time-badge').textContent = scene.timeZone || 'D';
+  
+  // 🌟 最終更新日時を画面にマイルドに表示します
+  document.getElementById('view-scene-updated-at').textContent = scene.updatedAt ? `最終更新日時: ${scene.updatedAt}` : '最終更新日時: 未記録';
+
   let dateText = (scene.dates && scene.dates.length > 0) ? scene.dates.join(', ') : '未定';
   let infoText = `場所: ${scene.location || '未定'} ｜ 撮影日: ${dateText}`;
   document.getElementById('view-scene-info').textContent = infoText;
+  
   const memoArea = document.getElementById('view-scene-memo');
   if (memoArea) {
     if (scene.memo) {
@@ -1340,7 +1467,7 @@ function renderSceneViewDetail() {
   if(scene.costumes && scene.costumes.length > 0) {
     let html = `<strong style="color: var(--text-color);">衣装</strong><br>`;
     scene.costumes.forEach(c => {
-      html += `<div style="padding: 8px; border-left: 2px solid var(--border-color); margin-bottom: 4px; background: rgba(0,0,0,0.02); display:flex; flex-direction:column; align-items:flex-start;">
+      html += `<div style="padding: 8px; border-left: 2px solid var(--border-left, var(--border-color)); margin-bottom: 4px; background: rgba(0,0,0,0.02); display:flex; flex-direction:column; align-items:flex-start;">
         <div style="display:flex; align-items:flex-start; width:100%;">
           <span class="status-color status-${c.status}" style="padding:2px 4px; font-size:11px; flex-shrink:0; margin-right:6px; margin-top:2px;">${c.status}</span> 
           <strong style="word-break:break-all; line-height:1.4;">${c.name}</strong>
@@ -1357,7 +1484,7 @@ function renderSceneViewDetail() {
   if(scene.props && scene.props.length > 0) {
     let html = `<strong style="color: var(--text-color);">小道具</strong><br>`;
     scene.props.forEach(p => {
-      html += `<div style="padding: 8px; border-left: 2px solid var(--border-color); margin-bottom: 4px; background: rgba(0,0,0,0.02); display:flex; flex-direction:column; align-items:flex-start;">
+      html += `<div style="padding: 8px; border-left: 2px solid var(--border-left, var(--border-color)); margin-bottom: 4px; background: rgba(0,0,0,0.02); display:flex; flex-direction:column; align-items:flex-start;">
         <div style="display:flex; align-items:flex-start; width:100%;">
           <span class="status-color status-${p.status}" style="padding:2px 4px; font-size:11px; flex-shrink:0; margin-right:6px; margin-top:2px;">${p.status}</span> 
           <strong style="word-break:break-all; line-height:1.4;">${p.name}</strong>
@@ -1376,6 +1503,7 @@ function renderSceneEditDetail() {
   if(!scene) return;
   
   document.getElementById('edit-scene-number').value = scene.number || '';
+  document.getElementById('edit-scene-time-zone').value = scene.timeZone || 'D'; // 時間帯
   document.getElementById('edit-scene-name').value = scene.sceneName || '';
   document.getElementById('edit-scene-location').value = scene.location || '';
   document.getElementById('edit-scene-memo').value = scene.memo || '';
@@ -1403,6 +1531,7 @@ window.saveEditedScene = function() {
   const scene = movie.scenes.find(s => s.id === currentSceneId);
   
   scene.number = document.getElementById('edit-scene-number').value;
+  scene.timeZone = document.getElementById('edit-scene-time-zone').value; // 時間帯の保存
   scene.sceneName = document.getElementById('edit-scene-name').value;
   scene.location = document.getElementById('edit-scene-location').value;
   scene.memo = document.getElementById('edit-scene-memo').value.trim();
@@ -1414,8 +1543,12 @@ window.saveEditedScene = function() {
   scene.costumes = newCostumes;
   scene.props = newProps;
 
+  // 🌟 詳細やメモも含めて完全同期する魔法を発動します！
   syncItemStatuses(movie, newCostumes, 'costumes');
   syncItemStatuses(movie, newProps, 'props');
+
+  // 🌟 何か変更があったため、最終更新日時を記録します！
+  scene.updatedAt = getNowFormattedString();
 
   saveMovie(movie); 
   populateSearchFilters();
