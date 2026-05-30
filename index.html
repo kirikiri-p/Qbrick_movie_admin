@@ -8,7 +8,8 @@
 <link rel="icon" href="Qbrick_icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<link rel="stylesheet" href="style.css?v=5">
+<!-- 🌟 キャッシュ強制クリアの魔法「?v=6」です！ -->
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
@@ -129,8 +130,10 @@
           <label class="input-label">シーン番号（必須）</label>
           <input type="number" id="new-scene-number" placeholder="例: 13" oninput="checkSceneInput()">
           
+          <!-- 🌟 未設定を選べるようにしました！ -->
           <label class="input-label">時間帯 (D/N/M/E)</label>
           <select id="new-scene-time-zone">
+            <option value="">- (未設定)</option>
             <option value="D">D (昼間 / Day)</option>
             <option value="N">N (夜 / Night)</option>
             <option value="M">M (朝 / Morning)</option>
@@ -204,8 +207,10 @@
               <h3>シーン基本情報</h3>
               <label class="input-label">シーン番号</label><input type="number" id="edit-scene-number">
               
+              <!-- 🌟 編集画面にも未設定を追加しました！ -->
               <label class="input-label">時間帯 (D/N/M/E)</label>
               <select id="edit-scene-time-zone">
+                <option value="">- (未設定)</option>
                 <option value="D">D (昼間 / Day)</option>
                 <option value="N">N (夜 / Night)</option>
                 <option value="M">M (朝 / Morning)</option>
@@ -243,6 +248,7 @@
   </div>
 </div>
 
-<script type="module" src="script.js?v=5"></script>
+<!-- 🌟 キャッシュ強制クリアの魔法「?v=6」です！ -->
+<script type="module" src="script.js?v=6"></script>
 </body>
 </html>
