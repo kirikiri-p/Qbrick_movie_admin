@@ -140,6 +140,17 @@ body.dark-mode .cal-bg-none { border-color: #666; }
 .time-zone-badge { display: inline-block; padding: 2px 8px; font-size: 12px; font-weight: bold; background: #e0e0e0; color: #333; border-radius: 4px; text-align: center; }
 body.dark-mode .time-zone-badge { background: #444; color: #fff; }
 
+/* 🌟 進捗バー（撮影進捗率・準備達成率の共通部品） */
+.progress-track { height: 6px; background: var(--border-color); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.progress-fill { height: 100%; background: #2e7d32; border-radius: 3px; transition: width 0.3s ease; }
+body.dark-mode .progress-fill { background: #66bb6a; }
+
+/* 🌟 衣装・小道具一覧の達成率カード */
+.rate-summary { display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+
+/* 🌟 「最速使用日が早い順」のときに表示する日付ラベル */
+.earliest-date-label { font-size: 11px; color: var(--muted-text); font-weight: normal; margin-top: 2px; }
+
 .scene-card-header { display: flex; align-items: flex-start; gap: 8px; }
 .scene-checkbox { margin-top: 4px; transform: scale(1.2); cursor: pointer; }
 .scene-content { flex: 1; }
