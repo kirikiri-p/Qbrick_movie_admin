@@ -131,22 +131,33 @@ export function renderGlobalCalendar() {
 
       const icons = new Set();
       dayScenes.forEach((item) => icons.add(item.movie.icon || '🎬'));
+      // セルからあふれないように絵文字は2つまでに抑える
+      const iconArr = Array.from(icons);
+      const iconText = iconArr.slice(0, 2).join('') + (iconArr.length > 2 ? '…' : '');
 
       td.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
         <span class="cal-day-num">${day}</span>
-        <span style="font-size:12px;">${escapeHtml(Array.from(icons).join(''))}</span>
+        <span style="font-size:12px; overflow:hidden; white-space:nowrap;">${escapeHtml(iconText)}</span>
       </div>`;
 
       const dotContainer = document.createElement('div');
       dotContainer.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-start; margin-top:4px;';
 
-      dayScenes.forEach((item) => {
+      // ドットも上限を設けて、超過分は「+n」でまとめる
+      const MAX_DOTS = 6;
+      dayScenes.slice(0, MAX_DOTS).forEach((item) => {
         let overall = getSceneOverallStatus(item.scene);
         if (item.scene.status === '撮影済み') overall = 'used';
         const dot = document.createElement('span');
         dot.className = `cal-status-circle cal-bg-${overall}`;
         dotContainer.appendChild(dot);
       });
+      if (dayScenes.length > MAX_DOTS) {
+        const more = document.createElement('span');
+        more.className = 'cal-more';
+        more.textContent = `+${dayScenes.length - MAX_DOTS}`;
+        dotContainer.appendChild(more);
+      }
       td.appendChild(dotContainer);
     } else {
       td.innerHTML = `<span class="cal-day-num">${day}</span>`;

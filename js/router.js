@@ -71,7 +71,11 @@ function executeGoMovie(mId, isDataUpdate) {
   document.getElementById('movie-detail-container')?.classList.remove('has-detail');
 
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
-  if (!movie) return;
+  if (!movie) {
+    // 他の端末で削除された等で映画が見つからない場合はホームへ戻す
+    window.location.hash = 'home';
+    return;
+  }
   document.getElementById('header-movie-title-nav').classList.remove('hidden');
   document.getElementById('header-title-sub').textContent = movie.title;
   document.getElementById('header-main-title').textContent = movie.title;
@@ -96,7 +100,11 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   state.currentMovieId = mId;
   state.currentSceneId = sId;
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
-  if (!movie) return;
+  if (!movie) {
+    // 他の端末で削除された等で映画が見つからない場合はホームへ戻す
+    window.location.hash = 'home';
+    return;
+  }
 
   const detailPane = document.getElementById('detail-pane');
 
@@ -142,7 +150,11 @@ function executeGoSearchScene(sId, mId, isDataUpdate) {
   state.currentMovieId = mId;
   state.currentSceneId = sId;
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
-  if (!movie) return;
+  if (!movie) {
+    // 他の端末で削除された等で映画が見つからない場合はホームへ戻す
+    window.location.hash = 'home';
+    return;
+  }
 
   const detailPane = document.getElementById('detail-pane');
   document.getElementById('search-detail-container').appendChild(detailPane);
@@ -176,6 +188,13 @@ function executeGoSearch(mId, isDataUpdate = false, preserveFilters = false) {
   document.body.style.overflow = '';
   state.currentMovieId = mId;
 
+  const movie = state.movies.find((m) => m.id === state.currentMovieId);
+  if (!movie) {
+    // 他の端末で削除された等で映画が見つからない場合はホームへ戻す
+    window.location.hash = 'home';
+    return;
+  }
+
   const detailPane = document.getElementById('detail-pane');
   detailPane.classList.remove('show-detail');
   document.getElementById('search-detail-container')?.classList.remove('has-detail');
@@ -196,7 +215,11 @@ function executeGoMovieDetails(mId, isDataUpdate) {
   document.body.style.overflow = '';
   state.currentMovieId = mId;
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
-  if (!movie) return;
+  if (!movie) {
+    // 他の端末で削除された等で映画が見つからない場合はホームへ戻す
+    window.location.hash = 'home';
+    return;
+  }
   if (!isDataUpdate) {
     document.getElementById('movie-detail-title').value = movie.title || '';
     document.getElementById('movie-detail-icon').value = movie.icon || '';

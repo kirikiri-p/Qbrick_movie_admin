@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- キャッシュ強制クリア用バージョン -->
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -128,7 +128,7 @@
         <div class="card card-no-click editor-only">
           <h3>新しいシーンを追加</h3>
           <label class="input-label">シーン番号（必須）</label>
-          <input type="number" id="new-scene-number" placeholder="例: 13">
+          <input type="text" id="new-scene-number" placeholder="例: 13 / 13A">
 
           <label class="input-label">時間帯 (D/N/M/E)</label>
           <select id="new-scene-time-zone">
@@ -202,41 +202,52 @@
 
           <div id="detail-pane-edit" class="hidden">
             <button class="close-btn" id="btn-cancel-edit">&lt; 編集をキャンセル</button>
-            <div class="card card-no-click">
-              <h3>シーン基本情報</h3>
-              <label class="input-label">シーン番号</label><input type="number" id="edit-scene-number">
 
-              <label class="input-label">時間帯 (D/N/M/E)</label>
-              <select id="edit-scene-time-zone">
-                <option value="">- (未設定)</option>
-                <option value="D">D (昼間 / Day)</option>
-                <option value="N">N (夜 / Night)</option>
-                <option value="M">M (朝 / Morning)</option>
-                <option value="E">E (夕方 / Evening)</option>
-              </select>
+            <details class="accordion" id="edit-acc-basic" open>
+              <summary>シーン基本情報</summary>
+              <div class="accordion-content">
+                <label class="input-label">シーン番号</label><input type="text" id="edit-scene-number" placeholder="例: 13 / 13A">
 
-              <label class="input-label">シーン名</label><input type="text" id="edit-scene-name">
-              <label class="input-label">場所</label><input type="text" id="edit-scene-location">
-              <label class="input-label">メモ・備考</label><textarea id="edit-scene-memo" placeholder="メモを入力"></textarea>
+                <label class="input-label">時間帯 (D/N/M/E)</label>
+                <select id="edit-scene-time-zone">
+                  <option value="">- (未設定)</option>
+                  <option value="D">D (昼間 / Day)</option>
+                  <option value="N">N (夜 / Night)</option>
+                  <option value="M">M (朝 / Morning)</option>
+                  <option value="E">E (夕方 / Evening)</option>
+                </select>
 
-              <label class="input-label">撮影日を変更</label>
-              <div id="edit-scene-dates"></div>
-              <button type="button" class="secondary" style="margin-top: 4px;" id="btn-add-date-edit">撮影日を追加</button>
+                <label class="input-label">シーン名</label><input type="text" id="edit-scene-name">
+                <label class="input-label">場所</label><input type="text" id="edit-scene-location">
+                <label class="input-label">メモ・備考</label><textarea id="edit-scene-memo" placeholder="メモを入力"></textarea>
+
+                <label class="input-label">撮影日を変更</label>
+                <div id="edit-scene-dates"></div>
+                <button type="button" class="secondary" style="margin-top: 4px;" id="btn-add-date-edit">撮影日を追加</button>
+              </div>
+            </details>
+
+            <details class="accordion" id="edit-acc-costume">
+              <summary style="color: #c2185b;">衣装<span class="acc-count" id="edit-costume-count"></span></summary>
+              <div class="accordion-content">
+                <div id="edit-costume-list"></div>
+                <button type="button" class="secondary" id="btn-add-costume-edit">衣装枠を追加</button>
+              </div>
+            </details>
+
+            <details class="accordion" id="edit-acc-prop">
+              <summary style="color: #1976d2;">小道具<span class="acc-count" id="edit-prop-count"></span></summary>
+              <div class="accordion-content">
+                <div id="edit-prop-list"></div>
+                <button type="button" class="secondary" id="btn-add-prop-edit">小道具枠を追加</button>
+              </div>
+            </details>
+
+            <div class="edit-action-bar">
+              <button type="button" class="secondary" id="btn-cancel-edit-bottom">キャンセル</button>
+              <button type="button" class="save-btn" id="btn-save-scene">変更を保存</button>
             </div>
 
-            <div class="card card-no-click">
-              <h3 style="color: #c2185b;">衣装の登録</h3>
-              <div id="edit-costume-list"></div>
-              <button type="button" class="secondary" id="btn-add-costume-edit">衣装枠を追加</button>
-            </div>
-
-            <div class="card card-no-click">
-              <h3 style="color: #1976d2;">小道具の登録</h3>
-              <div id="edit-prop-list"></div>
-              <button type="button" class="secondary" id="btn-add-prop-edit">小道具枠を追加</button>
-            </div>
-
-            <button style="background-color: #2e7d32; border-color: #2e7d32; padding: 16px; font-size: 16px; margin-bottom: 24px;" id="btn-save-scene">このシーンの変更を保存</button>
             <button class="danger" id="btn-delete-scene">このシーンだけ削除する</button>
           </div>
         </div>
@@ -247,6 +258,6 @@
 </div>
 
 <!-- 分割したモジュールの起点（main.jsが他のモジュールをimportする） -->
-<script type="module" src="js/main.js?v=7"></script>
+<script type="module" src="js/main.js?v=8"></script>
 </body>
 </html>

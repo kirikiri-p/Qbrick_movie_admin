@@ -9,6 +9,7 @@ import {
   addDateInput, addCostumeInput, addPropInput,
   collectDatesFromContainer, collectItemsFromDOM
 } from './items.js';
+import { showToast } from './toast.js';
 
 // ---- 閲覧パネル ------------------------------------------------------------
 export function renderSceneViewDetail() {
@@ -67,6 +68,28 @@ function renderItemList(elementId, label, items) {
 }
 
 // ---- 編集パネル ------------------------------------------------------------
+
+// 衣装・小道具アコーディオンの見出しに件数を表示し、枠の追加・削除に自動で追従させる
+let editCountObserversReady = false;
+function updateEditCounts() {
+  const c = document.querySelectorAll('#edit-costume-list .item-input-block').length;
+  const p = document.querySelectorAll('#edit-prop-list .item-input-block').length;
+  const cEl = document.getElementById('edit-costume-count');
+  const pEl = document.getElementById('edit-prop-count');
+  if (cEl) cEl.textContent = `（${c}件）`;
+  if (pEl) pEl.textContent = `（${p}件）`;
+}
+function ensureEditCountObservers() {
+  if (editCountObserversReady) return;
+  const cList = document.getElementById('edit-costume-list');
+  const pList = document.getElementById('edit-prop-list');
+  if (!cList || !pList) return;
+  const observer = new MutationObserver(updateEditCounts);
+  observer.observe(cList, { childList: true });
+  observer.observe(pList, { childList: true });
+  editCountObserversReady = true;
+}
+
 export function renderSceneEditDetail() {
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   const scene = movie?.scenes.find((s) => s.id === state.currentSceneId);
@@ -93,12 +116,24 @@ export function renderSceneEditDetail() {
   const pList = document.getElementById('edit-prop-list');
   pList.innerHTML = '';
   (scene.props || []).forEach((p) => addPropInput('edit-prop-list', p));
+
+  ensureEditCountObservers();
+  updateEditCounts();
 }
 
 export function openSceneEdit() {
   document.getElementById('detail-pane-view').classList.add('hidden');
   document.getElementById('detail-pane-edit').classList.remove('hidden');
+
+  // 開くたびにアコーディオンを初期状態に戻す（基本情報のみ展開）
+  document.getElementById('edit-acc-basic')?.setAttribute('open', 'true');
+  document.getElementById('edit-acc-costume')?.removeAttribute('open');
+  document.getElementById('edit-acc-prop')?.removeAttribute('open');
+
   renderSceneEditDetail();
+
+  // パネルの先頭から編集を始められるようにスクロール位置を戻す
+  document.getElementById('detail-pane')?.scrollTo?.(0, 0);
 }
 
 export function cancelSceneEdit() {
@@ -122,11 +157,8 @@ export async function saveEditedScene() {
     updatedAt: getNowFormattedString()
   };
 
-  // ローカルにも即時反映（画面のちらつき防止）
-  const localMovie = state.movies.find((m) => m.id === state.currentMovieId);
-  const localScene = localMovie?.scenes.find((s) => s.id === sceneId);
-  if (localScene) Object.assign(localScene, fields);
-
+  // 保存成功後はonSnapshot経由で最新データが届き、自動で再描画される。
+  // 失敗時は編集パネルが開いたままになるので、そのまま再試行できる。
   await updateMovie(state.currentMovieId, (data) => {
     const scene = data.scenes.find((s) => s.id === sceneId);
     if (!scene) return false;
@@ -139,7 +171,7 @@ export async function saveEditedScene() {
   state.renderedDailyDate = null;
 
   cancelSceneEdit();
-  alert('シーンの変更を保存しました');
+  showToast('シーンの変更を保存しました');
 }
 
 export async function deleteScene() {

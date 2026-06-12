@@ -7,6 +7,7 @@
 import { state } from './state.js';
 import { parseExcelDate, getNowFormattedString, safeStatus } from './utils.js';
 import { createMovie } from './firebase.js';
+import { showToast } from './toast.js';
 
 const DELIMITER = '|';
 
@@ -81,7 +82,7 @@ export function handleExcelUpload(event) {
       const movieTitle = file.name.replace(/\.[^/.]+$/, '');
       const newMovie = { id: Date.now(), title: movieTitle, scenes: newScenes, type: '', director: '', year: '', icon: '🎬' };
       await createMovie(newMovie);
-      alert(movieTitle + ' のデータを読み込みました');
+      showToast(movieTitle + ' のデータを読み込みました');
     } catch (err) {
       console.error(err);
       alert('Excelの読み込みに失敗しました。ファイル形式を確認してください。');

@@ -14,6 +14,7 @@ import {
 import { clearSearch, renderSearchResults } from './search.js';
 import { handleExcelUpload, exportToExcel } from './excel.js';
 import { addDateInput, addCostumeInput, addPropInput, checkSceneInput } from './items.js';
+import { showToast } from './toast.js';
 
 const EDITOR_PASSWORD = 'きゅーぶりっく';
 
@@ -33,14 +34,14 @@ function toggleEditorMode() {
     document.getElementById('editor-toggle-btn').textContent = '編集者モードになる';
     state.selectedSceneIds.clear();
     document.getElementById('bulk-delete-btn')?.classList.add('hidden');
-    alert('閲覧モードに戻りました');
+    showToast('閲覧モードに戻りました');
   } else {
     const pass = prompt('編集者用パスワードを入力してください');
     if (pass === EDITOR_PASSWORD) {
       state.isEditorMode = true;
       document.body.classList.add('editor-mode');
       document.getElementById('editor-toggle-btn').textContent = '閲覧モードに戻る';
-      alert('編集者モードに切り替わりました');
+      showToast('編集者モードに切り替わりました');
     } else if (pass !== null) {
       alert('パスワードが違います');
       return;
@@ -60,6 +61,7 @@ async function addMovie() {
   const newMovie = { id: Date.now(), title, scenes: [], type: '', director: '', year: '', icon: '🎬' };
   await createMovie(newMovie);
   titleInput.value = '';
+  showToast(`「${title}」を追加しました`);
 }
 
 async function saveMovieDetails() {
@@ -73,6 +75,7 @@ async function saveMovieDetails() {
     year: document.getElementById('movie-detail-year').value.trim(),
   };
   await updateMovie(state.currentMovieId, (data) => { Object.assign(data, fields); });
+  showToast('映画の情報を更新しました');
   nav.goHome();
 }
 
@@ -82,12 +85,35 @@ async function deleteMovieFromDetails() {
   if (!confirm(`映画「${movie.title}」を本当に削除しますか？`)) return;
   await deleteMovieDoc(state.currentMovieId);
   removeParticipation(state.currentMovieId); // 端末に残る参加フラグも掃除する
+  showToast('映画を削除しました');
   nav.goHome();
 }
 
 // ---- イベントの結線 -------------------------------------------------------------
 function bind(id, eventName, handler) {
   document.getElementById(id)?.addEventListener(eventName, handler);
+}
+
+// 通信を伴うボタン用の結線。処理中はボタンを無効化して
+// 二度押しによる重複登録・二重保存を防ぐ。
+function bindAsync(id, handler, after = null) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('click', async () => {
+    if (el.disabled) return;
+    const originalText = el.textContent;
+    el.disabled = true;
+    el.textContent = '処理中…';
+    try {
+      await handler();
+    } catch (e) {
+      // エラー通知はupdateMovie等の内部で表示済み
+    } finally {
+      el.textContent = originalText;
+      el.disabled = false;
+      if (after) after();
+    }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -101,13 +127,13 @@ document.addEventListener('DOMContentLoaded', () => {
   bind('header-search-btn', 'click', nav.goSearch);
 
   // ホーム
-  bind('btn-add-movie', 'click', addMovie);
+  bindAsync('btn-add-movie', addMovie);
   bind('excel-upload', 'change', handleExcelUpload);
   bind('editor-toggle-btn', 'click', toggleEditorMode);
 
   // 映画の基本情報
-  bind('btn-save-movie-details', 'click', saveMovieDetails);
-  bind('btn-delete-movie-details', 'click', deleteMovieFromDetails);
+  bindAsync('btn-save-movie-details', saveMovieDetails);
+  bindAsync('btn-delete-movie-details', deleteMovieFromDetails);
 
   // 検索
   bind('btn-back-search', 'click', nav.backFromSearch);
@@ -120,25 +146,26 @@ document.addEventListener('DOMContentLoaded', () => {
   bind('btn-add-date-new', 'click', () => addDateInput('new-scene-dates'));
   bind('btn-add-costume-new', 'click', () => addCostumeInput('new-costume-list'));
   bind('btn-add-prop-new', 'click', () => addPropInput('new-prop-list'));
-  bind('add-scene-btn', 'click', addScene);
+  bindAsync('add-scene-btn', addScene, checkSceneInput);
 
   // 映画画面: 一覧の操作
   bind('btn-view-list', 'click', () => setViewMode('list'));
   bind('btn-view-cos', 'click', () => setViewMode('cos'));
   bind('btn-view-prop', 'click', () => setViewMode('prop'));
   bind('sort-select', 'change', (e) => updateSort(e.target.value));
-  bind('bulk-delete-btn', 'click', deleteSelectedScenes);
+  bindAsync('bulk-delete-btn', deleteSelectedScenes);
   bind('btn-export-excel', 'click', exportToExcel);
 
   // シーン詳細パネル
   bind('btn-close-detail', 'click', nav.closeSceneDetail);
   bind('btn-open-edit', 'click', openSceneEdit);
   bind('btn-cancel-edit', 'click', cancelSceneEdit);
+  bind('btn-cancel-edit-bottom', 'click', cancelSceneEdit);
   bind('btn-add-date-edit', 'click', () => addDateInput('edit-scene-dates'));
   bind('btn-add-costume-edit', 'click', () => addCostumeInput('edit-costume-list'));
   bind('btn-add-prop-edit', 'click', () => addPropInput('edit-prop-list'));
-  bind('btn-save-scene', 'click', saveEditedScene);
-  bind('btn-delete-scene', 'click', deleteScene);
+  bindAsync('btn-save-scene', saveEditedScene);
+  bindAsync('btn-delete-scene', deleteScene);
 });
 
 // ---- ルーティング ----------------------------------------------------------------

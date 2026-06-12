@@ -6,6 +6,7 @@ import {
 import { updateMovie } from './firebase.js';
 import { goScene } from './nav.js';
 import { collectDatesFromContainer, collectItemsFromDOM, addDateInput, updateSelectColor, checkSceneInput } from './items.js';
+import { showToast } from './toast.js';
 
 // ---- 表示モード・並べ替え ----------------------------------------------------
 export function setViewMode(mode) {
@@ -205,14 +206,25 @@ export async function toggleSceneShotStatus(sceneId, checkbox, forceMovieId) {
   // 即時にローカルへ反映してから保存（onSnapshotで再描画される）
   const localMovie = state.movies.find((m) => m.id === movieId);
   const localScene = localMovie?.scenes.find((s) => s.id === sceneId);
+  const prevStatus = localScene?.status;
+  const prevUpdatedAt = localScene?.updatedAt;
   if (localScene) { localScene.status = newStatus; localScene.updatedAt = now; }
 
-  await updateMovie(movieId, (data) => {
-    const scene = data.scenes.find((s) => s.id === sceneId);
-    if (!scene) return false;
-    scene.status = newStatus;
-    scene.updatedAt = now;
-  });
+  checkbox.disabled = true; // 保存中の連打防止
+  try {
+    await updateMovie(movieId, (data) => {
+      const scene = data.scenes.find((s) => s.id === sceneId);
+      if (!scene) return false;
+      scene.status = newStatus;
+      scene.updatedAt = now;
+    });
+  } catch (e) {
+    // 保存に失敗したら見た目とローカル状態を元に戻す（エラー通知は表示済み）
+    checkbox.checked = !checkbox.checked;
+    if (localScene) { localScene.status = prevStatus; localScene.updatedAt = prevUpdatedAt; }
+  } finally {
+    checkbox.disabled = false;
+  }
 }
 
 // ---- 新しいシーンの追加 --------------------------------------------------------
@@ -251,6 +263,7 @@ export async function addScene() {
   document.getElementById('new-prop-list').innerHTML = '';
   document.getElementById('new-scene-details').removeAttribute('open');
   checkSceneInput();
+  showToast(`シーン ${num} を追加しました`);
 }
 
 // ---- 衣装・小道具一覧（インベントリ） -------------------------------------------
@@ -475,5 +488,5 @@ export async function renameInventoryItemBulk(typeKey, oldName) {
     state.openedAccordionNames.add(trimmed);
   }
 
-  alert(`「${oldName}」をすべて「${trimmed}」に変更しました。`);
+  showToast(`「${oldName}」をすべて「${trimmed}」に変更しました`);
 }
