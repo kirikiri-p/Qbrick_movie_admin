@@ -268,6 +268,13 @@ body.dark-mode .view-toggles button.active { background-color: #333; color: #fff
 .edit-action-bar button.secondary { flex: 1; }
 .edit-action-bar .save-btn { flex: 2; background-color: #2e7d32; border-color: #2e7d32; color: #fff; }
 
+/* 🌟 設定モーダル（日々スケジュール作成など） */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 1500; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; }
+.modal-box { width: 100%; max-width: 440px; max-height: calc(100vh - 32px); overflow-y: auto; margin-bottom: 0; }
+@supports (height: 100dvh) {
+  .modal-box { max-height: calc(100dvh - 32px); }
+}
+
 /* 🌟 トースト通知（保存完了などの非ブロッキング通知） */
 #toast-container { position: fixed; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 2000; pointer-events: none; }
 .toast { background: rgba(30, 30, 30, 0.92); color: #fff; padding: 10px 18px; border-radius: 20px; font-size: 13px; font-weight: bold; opacity: 0; transform: translateY(8px); transition: opacity 0.25s ease, transform 0.25s ease; max-width: 82%; box-sizing: border-box; text-align: center; }

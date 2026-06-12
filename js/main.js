@@ -15,6 +15,7 @@ import { clearSearch, renderSearchResults } from './search.js';
 import { handleExcelUpload, exportToExcel } from './excel.js';
 import { addDateInput, addCostumeInput, addPropInput, checkSceneInput } from './items.js';
 import { showToast } from './toast.js';
+import { openCallsheetDialog, closeCallsheetDialog, generateCallsheet } from './callsheet.js';
 
 const EDITOR_PASSWORD = 'きゅーぶりっく';
 
@@ -155,6 +156,18 @@ document.addEventListener('DOMContentLoaded', () => {
   bind('sort-select', 'change', (e) => updateSort(e.target.value));
   bindAsync('bulk-delete-btn', deleteSelectedScenes);
   bind('btn-export-excel', 'click', exportToExcel);
+
+  // 日々スケジュール作成（日別画面）
+  bind('btn-open-callsheet', 'click', openCallsheetDialog);
+  bind('btn-cs-cancel', 'click', closeCallsheetDialog);
+  bindAsync('btn-cs-generate', generateCallsheet);
+  bind('cs-lunch-enabled', 'change', (e) => {
+    document.getElementById('cs-lunch-detail').style.display = e.target.checked ? 'grid' : 'none';
+  });
+  // オーバーレイ（背景）タップで閉じる
+  document.getElementById('callsheet-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'callsheet-modal') closeCallsheetDialog();
+  });
 
   // シーン詳細パネル
   bind('btn-close-detail', 'click', nav.closeSceneDetail);
