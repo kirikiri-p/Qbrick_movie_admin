@@ -275,6 +275,7 @@ export async function generateCallsheet() {
     ws.getCell('AB5').value = sun.sunset;                      // 日の入
 
     // ---- 本表（時間 / 場所 / S# / 場面 / D/N / 備考） ----
+    const GREY = { argb: 'FF8C8C8C' }; // 撮影以外の行（集合・移動・休憩など）の文字色
     const writable = Math.min(rows.length, TABLE_ROW_COUNT);
     for (let i = 0; i < writable; i++) {
       const r = TABLE_FIRST_ROW + i;
@@ -288,6 +289,12 @@ export async function generateCallsheet() {
         if (row.memo) ws.getCell(`U${r}`).value = row.memo;
       } else {
         ws.getCell(`E${r}`).value = row.name || '';
+        // 撮影以外の行は時刻と内容をグレーにして、撮影行を目立たせる
+        // （テンプレートのフォント名・サイズは引き継いで色だけ上書き）
+        ['B', 'E'].forEach((col) => {
+          const cell = ws.getCell(`${col}${r}`);
+          cell.font = { ...(cell.font || {}), color: GREY };
+        });
       }
     }
     if (rows.length > TABLE_ROW_COUNT) {
