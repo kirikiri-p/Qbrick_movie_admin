@@ -268,19 +268,23 @@ export async function generateCallsheet() {
     const dayPart = settings.dayNum ? `　Day${settings.dayNum}` : '';
     ws.getCell('B2').value = `Qbrick　映画「${movie.title}」日々スケジュール${dayPart}`;
     ws.getCell('B3').value = ` ${m}月${d}日（${weekday}）`;
-    if (settings.meetPlace) ws.getCell('G4').value = settings.meetPlace;
+    if (settings.meetPlace) {
+      ws.getCell('G4').value = settings.meetPlace; // 集合場所
+      ws.getCell('L4').value = settings.meetPlace; // 機材場所（集合場所と同じ場所を記入）
+    }
     ws.getCell('U4').value = fmtMin(toMin(settings.meetTime)); // スタッフ集合時間
     ws.getCell('V4').value = fmtMin(shootStart);               // 撮影開始時間
     ws.getCell('X4').value = fmtMin(shootEnd);                 // 撮影終了予定時間
     ws.getCell('AB4').value = sun.sunrise;                     // 日の出
     ws.getCell('AB5').value = sun.sunset;                      // 日の入
 
-    // ---- 登場人物の○列（テンプレ中央の空き列 K〜T の最大10列） ----
+    // ---- 登場人物の○列（テンプレ中央の空き列 L〜T の最大9列） ----
     // 画像のように、各シーン行にその場に出る登場人物を○で示す。
     // 列見出しはその日に出る登場人物を、映画の登録順(movie.cast)を優先して並べる。
-    const CHAR_FIRST_COL = 11; // K列
-    const CHAR_COL_COUNT = 10; // K〜T列
-    const colLetter = (n) => String.fromCharCode(64 + n); // 11→'K' … 20→'T'
+    // ※ J列=CUT・K列=PAGE は手書き欄なので避け、L列以降を使う。
+    const CHAR_FIRST_COL = 12; // L列
+    const CHAR_COL_COUNT = 9;  // L〜T列
+    const colLetter = (n) => String.fromCharCode(64 + n); // 12→'L' … 20→'T'
 
     const dayCharSet = new Set();
     scenes.forEach((s) => (s.characters || []).forEach((c) => dayCharSet.add(c)));
@@ -292,7 +296,7 @@ export async function generateCallsheet() {
     const usedCharColumns = charColumns.slice(0, CHAR_COL_COUNT);
     const charColIndex = new Map(usedCharColumns.map((name, i) => [name, CHAR_FIRST_COL + i]));
 
-    // 列見出し（K6〜T6）。H/I/J（L/S・D/N・PAGE）と同じ縦書きヘッダーに合わせる。
+    // 列見出し（L6〜T6）。H/I/J/K（L/S・D/N・CUT・PAGE）と同じ縦書きヘッダーに合わせる。
     usedCharColumns.forEach((name, i) => {
       const L = colLetter(CHAR_FIRST_COL + i);
       try { ws.mergeCells(`${L}6:${L}7`); } catch (e) { /* 既に結合済みなら無視 */ }
@@ -351,19 +355,25 @@ export async function generateCallsheet() {
       ws.getCell(`Y${CAST_FIRST_ROW + CAST_ROW_COUNT - 1}`).value = '※人数が多いため一部省略';
     }
 
-    // ---- 部署割（B39:T41の枠に1セット記入） ----
+    // ---- 部署割 ----
     // 監督名はアプリ登録から自動。他部署は空欄を用意して現場で記入。
+    // ★書き込み先セル: テンプレに「部署割」専用の枠（罫線で作った実セル。図形は不可）を
+    //   用意し、その枠の左上セル番地を DEPT_CELL に設定する。
+    //   結合セルなら左上セルを指定すること。未使用にしたい場合は DEPT_CELL = null。
+    const DEPT_CELL = 'B39'; // TODO: 専用枠を作ったらその左上セル番地に変更（現状は左下「現場住所」枠）
     const director = (movie.director || '').trim();
-    const deptLines = [
-      `監督：${director}`,
-      '制作：',
-      '撮影：',
-      '録音：',
-      '照明：',
-    ];
-    const deptCell = ws.getCell('B39');
-    deptCell.value = deptLines.join('\n');
-    deptCell.alignment = { ...(deptCell.alignment || {}), wrapText: true, vertical: 'top', horizontal: 'left' };
+    if (DEPT_CELL) {
+      const deptLines = [
+        `監督：${director}`,
+        '制作：',
+        '撮影：',
+        '録音：',
+        '照明：',
+      ];
+      const deptCell = ws.getCell(DEPT_CELL);
+      deptCell.value = deptLines.join('\n');
+      deptCell.alignment = { ...(deptCell.alignment || {}), wrapText: true, vertical: 'top', horizontal: 'left' };
+    }
 
     // ---- STAFF連絡先（監督名を記入） ----
     if (director) {

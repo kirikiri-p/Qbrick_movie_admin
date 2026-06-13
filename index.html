@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- キャッシュ強制クリア用バージョン -->
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 
@@ -294,8 +294,8 @@
       <div><label class="input-label">移動時間（分）</label><input type="number" id="cs-move-min" value="30" min="0"></div>
     </div>
 
-    <label class="input-label">集合場所（任意）</label>
-    <input type="text" id="cs-meet-place" placeholder="例: 知命堂">
+    <label class="input-label">集合場所・機材場所</label>
+    <input type="text" id="cs-meet-place" value="知命堂" placeholder="例: 知命堂">
 
     <label class="input-label" style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:16px;">
       <input type="checkbox" id="cs-lunch-enabled" checked style="width:18px; height:18px; margin:0;"> 昼休憩を挟む
@@ -313,6 +313,6 @@
 </div>
 
 <!-- 分割したモジュールの起点（main.jsが他のモジュールをimportする） -->
-<script type="module" src="js/main.js?v=12"></script>
+<script type="module" src="js/main.js?v=13"></script>
 </body>
 </html>
