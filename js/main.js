@@ -13,7 +13,7 @@ import {
 } from './detail.js';
 import { clearSearch, renderSearchResults } from './search.js';
 import { handleExcelUpload, exportToExcel } from './excel.js';
-import { addDateInput, addCostumeInput, addPropInput, checkSceneInput } from './items.js';
+import { addDateInput, addCostumeInput, addPropInput, checkSceneInput, addCastInput, collectCastFromDOM } from './items.js';
 import { showToast } from './toast.js';
 import { openCallsheetDialog, closeCallsheetDialog, generateCallsheet } from './callsheet.js';
 
@@ -59,7 +59,7 @@ async function addMovie() {
   const titleInput = document.getElementById('new-movie-title');
   const title = titleInput.value.trim();
   if (!title) return;
-  const newMovie = { id: Date.now(), title, scenes: [], type: '', director: '', year: '', icon: '🎬' };
+  const newMovie = { id: Date.now(), title, scenes: [], type: '', director: '', year: '', icon: '🎬', cast: [] };
   await createMovie(newMovie);
   titleInput.value = '';
   showToast(`「${title}」を追加しました`);
@@ -74,6 +74,7 @@ async function saveMovieDetails() {
     type: document.getElementById('movie-detail-type').value,
     director: document.getElementById('movie-detail-director').value.trim(),
     year: document.getElementById('movie-detail-year').value.trim(),
+    cast: collectCastFromDOM('movie-detail-cast'),
   };
   await updateMovie(state.currentMovieId, (data) => { Object.assign(data, fields); });
   showToast('映画の情報を更新しました');
@@ -135,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 映画の基本情報
   bindAsync('btn-save-movie-details', saveMovieDetails);
   bindAsync('btn-delete-movie-details', deleteMovieFromDetails);
+  bind('btn-add-cast', 'click', () => addCastInput('movie-detail-cast'));
 
   // 検索
   bind('btn-back-search', 'click', nav.backFromSearch);

@@ -5,7 +5,7 @@ import { renderHome } from './home.js';
 import { renderMovie, createSceneCard } from './movie.js';
 import { renderSceneViewDetail, renderSceneEditDetail } from './detail.js';
 import { populateSearchFilters, restoreSearchFilters, clearSearch } from './search.js';
-import { addDateInput } from './items.js';
+import { addDateInput, addCastInput } from './items.js';
 import { setViewMode } from './movie.js';
 
 export function handleHash(isDataUpdate = false) {
@@ -226,6 +226,14 @@ function executeGoMovieDetails(mId, isDataUpdate) {
     document.getElementById('movie-detail-type').value = movie.type || '';
     document.getElementById('movie-detail-director').value = movie.director || '';
     document.getElementById('movie-detail-year').value = movie.year || '';
+
+    const castContainer = document.getElementById('movie-detail-cast');
+    castContainer.innerHTML = '';
+    if (movie.cast && movie.cast.length > 0) {
+      movie.cast.forEach((c) => addCastInput('movie-detail-cast', c));
+    } else {
+      addCastInput('movie-detail-cast');
+    }
   }
   showViewUI('view-movie-details');
 }

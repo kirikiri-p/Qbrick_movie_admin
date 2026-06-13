@@ -301,6 +301,39 @@ export async function generateCallsheet() {
       ws.getCell(`E${TABLE_FIRST_ROW + TABLE_ROW_COUNT - 1}`).value = '※行数が足りないため以降は省略（シーン数を確認してください）';
     }
 
+    // ---- キャスト欄（その映画の登場人物全員を「役名/出演者」に記入） ----
+    // ヘッダはY6:Z7。データ行はY8〜Y23の16行ぶん。
+    const CAST_FIRST_ROW = 8;
+    const CAST_ROW_COUNT = 16;
+    const castList = movie.cast || [];
+    castList.slice(0, CAST_ROW_COUNT).forEach((c, i) => {
+      const r = CAST_FIRST_ROW + i;
+      // 「登場人物（役者）」の形。役者未登録なら登場人物名のみ。
+      ws.getCell(`Y${r}`).value = c.actor ? `${c.character}（${c.actor}）` : c.character;
+    });
+    if (castList.length > CAST_ROW_COUNT) {
+      ws.getCell(`Y${CAST_FIRST_ROW + CAST_ROW_COUNT - 1}`).value = '※人数が多いため一部省略';
+    }
+
+    // ---- 部署割（B39:T41の枠に1セット記入） ----
+    // 監督名はアプリ登録から自動。他部署は空欄を用意して現場で記入。
+    const director = (movie.director || '').trim();
+    const deptLines = [
+      `監督：${director}`,
+      '制作：',
+      '撮影：',
+      '録音：',
+      '照明：',
+    ];
+    const deptCell = ws.getCell('B39');
+    deptCell.value = deptLines.join('\n');
+    deptCell.alignment = { ...(deptCell.alignment || {}), wrapText: true, vertical: 'top', horizontal: 'left' };
+
+    // ---- STAFF連絡先（監督名を記入） ----
+    if (director) {
+      ws.getCell('V39').value = `監督：${director}`;
+    }
+
     // ---- ダウンロード ----
     const outBuf = await workbook.xlsx.writeBuffer();
     const blob = new Blob([outBuf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });

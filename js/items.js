@@ -175,3 +175,47 @@ export function collectItemsFromDOM(containerId) {
   });
   return items;
 }
+
+// ---- 登場人物・配役の入力行 ----------------------------------------------------
+// 「登場人物名」と「役者名」のペアを1行で扱う。役者名は空でも可。
+export function addCastInput(containerId, cast = null) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const div = document.createElement('div');
+  div.className = 'cast-input-row';
+
+  const charInput = document.createElement('input');
+  charInput.type = 'text';
+  charInput.className = 'cast-char';
+  charInput.placeholder = '登場人物（例: 羽芝）';
+  charInput.value = cast ? (cast.character || '') : '';
+
+  const actorInput = document.createElement('input');
+  actorInput.type = 'text';
+  actorInput.className = 'cast-actor';
+  actorInput.placeholder = '役者（任意）';
+  actorInput.value = cast ? (cast.actor || '') : '';
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'item-remove-btn';
+  removeBtn.style.cssText = 'position: static; padding: 8px 10px;';
+  removeBtn.title = 'この行を消す';
+  removeBtn.textContent = '✕';
+  removeBtn.addEventListener('click', () => div.remove());
+
+  div.append(charInput, actorInput, removeBtn);
+  container.appendChild(div);
+}
+
+// 登場人物の入力行を配列として収集（登場人物名が空の行は無視）
+export function collectCastFromDOM(containerId) {
+  const cast = [];
+  document.querySelectorAll(`#${containerId} .cast-input-row`).forEach((row) => {
+    const character = row.querySelector('.cast-char').value.trim();
+    const actor = row.querySelector('.cast-actor').value.trim();
+    if (character) cast.push({ character, actor });
+  });
+  return cast;
+}
