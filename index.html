@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- キャッシュ強制クリア用バージョン -->
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 
@@ -115,6 +115,7 @@
             <div><label class="input-label">シーン番号</label><select id="search-number"></select></div>
             <div><label class="input-label">場所</label><select id="search-location"></select></div>
             <div><label class="input-label">日付</label><select id="search-date"></select></div>
+            <div><label class="input-label">登場人物</label><select id="search-character"></select></div>
             <div><label class="input-label">衣装名</label><select id="search-costume"></select></div>
             <div><label class="input-label">物品名</label><select id="search-prop"></select></div>
           </div>
@@ -156,6 +157,9 @@
               <input type="text" id="new-scene-name" placeholder="例: オープニング">
               <label class="input-label">場所</label>
               <input type="text" id="new-scene-location" placeholder="例: 熊本大学北キャンパスくすのきホール">
+
+              <label class="input-label">登場人物</label>
+              <div id="new-scene-characters" class="character-check-list"></div>
 
               <label class="input-label">撮影日</label>
               <div id="new-scene-dates"></div>
@@ -200,6 +204,7 @@
               </div>
               <div id="view-scene-info" class="scene-info" style="margin-bottom: 16px;"></div>
               <div id="view-scene-updated-at" class="scene-info" style="color:var(--muted-text); font-size:11px; margin-bottom:12px;"></div>
+              <div id="view-scene-characters" style="margin-bottom: 12px;"></div>
               <div id="view-scene-memo" style="margin-top: 12px;"></div>
               <div id="view-scene-costumes" style="margin-bottom: 12px;"></div>
               <div id="view-scene-props"></div>
@@ -231,6 +236,13 @@
                 <label class="input-label">撮影日を変更</label>
                 <div id="edit-scene-dates"></div>
                 <button type="button" class="secondary" style="margin-top: 4px;" id="btn-add-date-edit">撮影日を追加</button>
+              </div>
+            </details>
+
+            <details class="accordion" id="edit-acc-character">
+              <summary style="color: #6a1b9a;">登場人物<span class="acc-count" id="edit-character-count"></span></summary>
+              <div class="accordion-content">
+                <div id="edit-scene-characters" class="character-check-list"></div>
               </div>
             </details>
 
@@ -301,6 +313,6 @@
 </div>
 
 <!-- 分割したモジュールの起点（main.jsが他のモジュールをimportする） -->
-<script type="module" src="js/main.js?v=11"></script>
+<script type="module" src="js/main.js?v=12"></script>
 </body>
 </html>

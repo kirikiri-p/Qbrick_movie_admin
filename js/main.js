@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 検索
   bind('btn-back-search', 'click', nav.backFromSearch);
   bind('btn-clear-search', 'click', () => clearSearch());
-  document.querySelectorAll('#search-number, #search-location, #search-date, #search-costume, #search-prop')
+  document.querySelectorAll('#search-number, #search-location, #search-date, #search-character, #search-costume, #search-prop')
     .forEach((el) => el.addEventListener('change', renderSearchResults));
 
   // 映画画面: 新規シーン追加フォーム

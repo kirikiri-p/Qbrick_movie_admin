@@ -19,6 +19,14 @@ function splitCell(value) {
   return s.split(delim);
 }
 
+// 「登場人物（役者）」表記を分解する。全角・半角どちらの括弧にも対応。役者は任意。
+function parseCharEntry(entry) {
+  const t = String(entry).trim();
+  const m = t.match(/^(.*?)[（(](.*)[）)]\s*$/);
+  if (m) return { character: m[1].trim(), actor: m[2].trim() };
+  return { character: t, actor: '' };
+}
+
 export function handleExcelUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -33,6 +41,8 @@ export function handleExcelUpload(event) {
       const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       const rows = json.slice(1);
       const newScenes = [];
+      // 登場人物（役者）を全シーンから集約して配役登録（movie.cast）を復元する
+      const castMap = new Map();
 
       rows.forEach((row, index) => {
         if (!row || row.length === 0) return;
@@ -66,21 +76,37 @@ export function handleExcelUpload(event) {
           price: (pPrices[i] || '').trim()
         })).filter((p) => p.name);
 
+        // 追加列（13列目以降）。旧形式ファイルでは undefined になり、既定値で扱う。
+        const status = String(row[12] ?? '').trim() === '撮影済み' ? '撮影済み' : '未撮影';
+        const timeZone = String(row[13] ?? '').trim();
+        const memo = String(row[14] ?? '');
+        const charEntries = splitCell(row[15]).map(parseCharEntry).filter((e) => e.character);
+        const characters = charEntries.map((e) => e.character);
+        // 配役登録の復元用に集約（役者名は非空のものを優先して採用）
+        charEntries.forEach((e) => {
+          if (!castMap.has(e.character) || (!castMap.get(e.character) && e.actor)) {
+            castMap.set(e.character, e.actor);
+          }
+        });
+
         const existing = newScenes.find((s) => s.number === number && s.sceneName === sceneName && s.location === location);
         if (existing) {
           if (costumes.length > 0) existing.costumes.push(...costumes);
           if (props.length > 0) existing.props.push(...props);
           dates.forEach((d) => { if (!existing.dates.includes(d)) existing.dates.push(d); });
+          characters.forEach((c) => { if (!existing.characters.includes(c)) existing.characters.push(c); });
         } else {
           newScenes.push({
             id: Date.now() + index, number, dates, sceneName, location,
-            costumes, props, status: '未撮影', updatedAt: getNowFormattedString()
+            characters, costumes, props,
+            status, timeZone, memo, updatedAt: getNowFormattedString()
           });
         }
       });
 
       const movieTitle = file.name.replace(/\.[^/.]+$/, '');
-      const newMovie = { id: Date.now(), title: movieTitle, scenes: newScenes, type: '', director: '', year: '', icon: '🎬' };
+      const cast = Array.from(castMap, ([character, actor]) => ({ character, actor }));
+      const newMovie = { id: Date.now(), title: movieTitle, scenes: newScenes, type: '', director: '', year: '', icon: '🎬', cast };
       await createMovie(newMovie);
       showToast(movieTitle + ' のデータを読み込みました');
     } catch (err) {
@@ -96,16 +122,33 @@ export function handleExcelUpload(event) {
 export function exportToExcel() {
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   if (!movie) return;
-  const aoa = [['シーン番号', '撮影日', 'シーン名', '場所', '衣装ステータス', '衣装名', '衣装詳細', '金額/メモ', '小道具ステータス', '物品名', '小道具詳細', '金額/メモ']];
+
+  // 先頭12列は従来どおり（過去のテンプレ・旧ファイルとの互換維持）。
+  // 13列目以降に「撮影ステータス・時間帯・メモ・登場人物」を追加し、
+  // エクスポート→再インポートで全情報が復元されるようにする。
+  const aoa = [[
+    'シーン番号', '撮影日', 'シーン名', '場所',
+    '衣装ステータス', '衣装名', '衣装詳細', '金額/メモ',
+    '小道具ステータス', '物品名', '小道具詳細', '金額/メモ',
+    '撮影ステータス', '時間帯', 'メモ', '登場人物'
+  ]];
+
+  // 登場人物名→役者名（配役登録から補完し「名前（役者）」形式で書き出す）
+  const actorOf = {};
+  (movie.cast || []).forEach((c) => { if (c.character) actorOf[c.character] = c.actor || ''; });
 
   movie.scenes.forEach((s) => {
     const dateStr = s.dates ? s.dates.join(',') : '';
     const join = (items, key) => (items || []).map((i) => i[key] ?? '').join(DELIMITER);
+    const charStr = (s.characters || [])
+      .map((n) => (actorOf[n] ? `${n}（${actorOf[n]}）` : n))
+      .join(DELIMITER);
 
     aoa.push([
       s.number, dateStr, s.sceneName, s.location,
       join(s.costumes, 'status'), join(s.costumes, 'name'), join(s.costumes, 'desc'), join(s.costumes, 'price'),
-      join(s.props, 'status'), join(s.props, 'name'), join(s.props, 'desc'), join(s.props, 'price')
+      join(s.props, 'status'), join(s.props, 'name'), join(s.props, 'desc'), join(s.props, 'price'),
+      s.status || '未撮影', s.timeZone || '', s.memo || '', charStr
     ]);
   });
 

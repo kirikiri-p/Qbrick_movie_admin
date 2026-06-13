@@ -209,6 +209,63 @@ export function addCastInput(containerId, cast = null) {
   container.appendChild(div);
 }
 
+// ---- シーンへの登場人物の割り当て（チェックボックス） --------------------------
+// その映画に登録済みの登場人物（movie.cast）を選択肢として並べ、
+// シーンに出る人物にチェックを入れる。登録から消えたが既にシーンへ割り当て済みの
+// 名前（selectedNames側にしか無い名前）も選択肢に残し、勝手に消えないようにする。
+export function renderCharacterCheckboxes(containerId, selectedNames = []) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const movie = state.movies.find((m) => m.id === state.currentMovieId);
+  const cast = (movie && Array.isArray(movie.cast)) ? movie.cast : [];
+
+  const names = [];
+  const seen = new Set();
+  cast.forEach((c) => {
+    if (c.character && !seen.has(c.character)) {
+      seen.add(c.character);
+      names.push({ character: c.character, actor: c.actor || '' });
+    }
+  });
+  selectedNames.forEach((n) => {
+    if (n && !seen.has(n)) { seen.add(n); names.push({ character: n, actor: '' }); }
+  });
+
+  if (names.length === 0) {
+    container.innerHTML = '<p class="scene-info" style="margin:0;">登場人物が未登録です。映画一覧の「編集」→基本情報で登録してください。</p>';
+    return;
+  }
+
+  const selectedSet = new Set(selectedNames);
+  names.forEach(({ character, actor }) => {
+    const label = document.createElement('label');
+    label.className = 'character-check';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'character-checkbox';
+    cb.value = character;
+    cb.checked = selectedSet.has(character);
+
+    const span = document.createElement('span');
+    span.textContent = actor ? `${character}（${actor}）` : character;
+
+    label.append(cb, span);
+    container.appendChild(label);
+  });
+}
+
+// チェックの入った登場人物名を配列で収集する
+export function collectCharactersFromDOM(containerId) {
+  const names = [];
+  document.querySelectorAll(`#${containerId} .character-checkbox:checked`).forEach((cb) => {
+    if (cb.value) names.push(cb.value);
+  });
+  return names;
+}
+
 // 登場人物の入力行を配列として収集（登場人物名が空の行は無視）
 export function collectCastFromDOM(containerId) {
   const cast = [];

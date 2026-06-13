@@ -154,6 +154,7 @@ export function buildTimeline(scenes, settings) {
       number: scene.number,
       name: scene.sceneName || '',
       zone: scene.timeZone || '',
+      characters: scene.characters || [],
       memo: scene.memo ? String(scene.memo).split('\n')[0].slice(0, 30) : ''
     });
     t += settings.sceneMin;
@@ -274,7 +275,33 @@ export async function generateCallsheet() {
     ws.getCell('AB4').value = sun.sunrise;                     // 日の出
     ws.getCell('AB5').value = sun.sunset;                      // 日の入
 
-    // ---- 本表（時間 / 場所 / S# / 場面 / D/N / 備考） ----
+    // ---- 登場人物の○列（テンプレ中央の空き列 K〜T の最大10列） ----
+    // 画像のように、各シーン行にその場に出る登場人物を○で示す。
+    // 列見出しはその日に出る登場人物を、映画の登録順(movie.cast)を優先して並べる。
+    const CHAR_FIRST_COL = 11; // K列
+    const CHAR_COL_COUNT = 10; // K〜T列
+    const colLetter = (n) => String.fromCharCode(64 + n); // 11→'K' … 20→'T'
+
+    const dayCharSet = new Set();
+    scenes.forEach((s) => (s.characters || []).forEach((c) => dayCharSet.add(c)));
+    const charColumns = [];
+    (movie.cast || []).forEach((c) => {
+      if (c.character && dayCharSet.has(c.character) && !charColumns.includes(c.character)) charColumns.push(c.character);
+    });
+    dayCharSet.forEach((name) => { if (!charColumns.includes(name)) charColumns.push(name); });
+    const usedCharColumns = charColumns.slice(0, CHAR_COL_COUNT);
+    const charColIndex = new Map(usedCharColumns.map((name, i) => [name, CHAR_FIRST_COL + i]));
+
+    // 列見出し（K6〜T6）。H/I/J（L/S・D/N・PAGE）と同じ縦書きヘッダーに合わせる。
+    usedCharColumns.forEach((name, i) => {
+      const L = colLetter(CHAR_FIRST_COL + i);
+      try { ws.mergeCells(`${L}6:${L}7`); } catch (e) { /* 既に結合済みなら無視 */ }
+      const cell = ws.getCell(`${L}6`);
+      cell.value = name;
+      cell.alignment = { textRotation: 255, horizontal: 'center', vertical: 'top', wrapText: true };
+    });
+
+    // ---- 本表（時間 / 場所 / S# / 場面 / D/N / 登場人物○ / 備考） ----
     const GREY = { argb: 'FF8C8C8C' }; // 撮影以外の行（集合・移動・休憩など）の文字色
     const writable = Math.min(rows.length, TABLE_ROW_COUNT);
     for (let i = 0; i < writable; i++) {
@@ -286,6 +313,15 @@ export async function generateCallsheet() {
         ws.getCell(`D${r}`).value = row.number ?? '';
         ws.getCell(`E${r}`).value = row.name || '';
         ws.getCell(`I${r}`).value = row.zone || '';
+        // その場に出る登場人物の列に○を立てる
+        (row.characters || []).forEach((name) => {
+          const ci = charColIndex.get(name);
+          if (ci) {
+            const cell = ws.getCell(`${colLetter(ci)}${r}`);
+            cell.value = '○';
+            cell.alignment = { horizontal: 'center', vertical: 'center' };
+          }
+        });
         if (row.memo) ws.getCell(`U${r}`).value = row.memo;
       } else {
         ws.getCell(`E${r}`).value = row.name || '';

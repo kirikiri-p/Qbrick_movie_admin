@@ -5,7 +5,7 @@ import {
 } from './utils.js';
 import { updateMovie } from './firebase.js';
 import { goScene } from './nav.js';
-import { collectDatesFromContainer, collectItemsFromDOM, addDateInput, updateSelectColor, checkSceneInput } from './items.js';
+import { collectDatesFromContainer, collectItemsFromDOM, addDateInput, updateSelectColor, checkSceneInput, collectCharactersFromDOM, renderCharacterCheckboxes } from './items.js';
 import { showToast } from './toast.js';
 
 // ---- 表示モード・並べ替え ----------------------------------------------------
@@ -140,6 +140,12 @@ export function createSceneCard(scene, forceMovieId = null) {
     html += `<div class="scene-info" style="font-size:10px; color:var(--muted-text);">最終更新: ${escapeHtml(scene.updatedAt)}</div>`;
   }
 
+  if (scene.characters && scene.characters.length > 0) {
+    html += `<div style="margin-top: 8px;">`;
+    scene.characters.forEach((c) => { html += `<span class="character-badge">🎭 ${escapeHtml(c)}</span>`; });
+    html += `</div>`;
+  }
+
   html += `<div style="margin-top: 8px;">`;
   if (scene.costumes && scene.costumes.length > 0) {
     scene.costumes.forEach((c) => { html += `<span class="item-badge status-${safeStatus(c.status)}">${escapeHtml(c.name)}</span>`; });
@@ -235,13 +241,14 @@ export async function addScene() {
   const timeZone = document.getElementById('new-scene-time-zone').value;
   const memo = document.getElementById('new-scene-memo').value.trim();
   const dates = collectDatesFromContainer('new-scene-dates');
+  const characters = collectCharactersFromDOM('new-scene-characters');
 
   const newCostumes = collectItemsFromDOM('new-costume-list');
   const newProps = collectItemsFromDOM('new-prop-list');
 
   const newScene = {
     id: Date.now(), number: num, sceneName: name, location: loc, memo: memo, dates: dates,
-    timeZone: timeZone, status: '未撮影', costumes: newCostumes, props: newProps,
+    timeZone: timeZone, status: '未撮影', characters: characters, costumes: newCostumes, props: newProps,
     updatedAt: getNowFormattedString()
   };
 
@@ -259,6 +266,7 @@ export async function addScene() {
   document.getElementById('new-scene-memo').value = '';
   document.getElementById('new-scene-dates').innerHTML = '';
   addDateInput('new-scene-dates');
+  renderCharacterCheckboxes('new-scene-characters', []);
   document.getElementById('new-costume-list').innerHTML = '';
   document.getElementById('new-prop-list').innerHTML = '';
   document.getElementById('new-scene-details').removeAttribute('open');
@@ -273,6 +281,13 @@ export function getUniqueItemNames(movie, typeKey) {
     const items = (typeKey === 'costumes' ? s.costumes : s.props) || [];
     items.forEach((item) => names.add(item.name));
   });
+  return Array.from(names).sort();
+}
+
+// シーンに割り当てられている登場人物名を重複なく集める（検索フィルタ用）
+export function getUniqueCharacterNames(movie) {
+  const names = new Set();
+  movie.scenes.forEach((s) => (s.characters || []).forEach((c) => names.add(c)));
   return Array.from(names).sort();
 }
 

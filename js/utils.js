@@ -74,6 +74,7 @@ export function migrateSceneData(scene) {
       });
     }
   }
+  if (!Array.isArray(scene.characters)) scene.characters = [];
   if (!scene.memo) scene.memo = '';
   if (!scene.status) scene.status = '未撮影';
   if (!scene.timeZone) scene.timeZone = '';

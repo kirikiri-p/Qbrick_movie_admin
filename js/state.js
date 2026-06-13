@@ -20,5 +20,5 @@ export const state = {
   renderedMovieId: null,
   renderedDailyDate: null,
 
-  lastSearchFilters: { number: '', location: '', date: '', costume: '', prop: '' },
+  lastSearchFilters: { number: '', location: '', date: '', character: '', costume: '', prop: '' },
 };

@@ -5,7 +5,7 @@ import { renderHome } from './home.js';
 import { renderMovie, createSceneCard } from './movie.js';
 import { renderSceneViewDetail, renderSceneEditDetail } from './detail.js';
 import { populateSearchFilters, restoreSearchFilters, clearSearch } from './search.js';
-import { addDateInput, addCastInput } from './items.js';
+import { addDateInput, addCastInput, renderCharacterCheckboxes } from './items.js';
 import { setViewMode } from './movie.js';
 
 export function handleHash(isDataUpdate = false) {
@@ -83,6 +83,7 @@ function executeGoMovie(mId, isDataUpdate) {
   if (!isDataUpdate && state.renderedMovieId !== state.currentMovieId) {
     document.getElementById('new-scene-dates').innerHTML = '';
     addDateInput('new-scene-dates');
+    renderCharacterCheckboxes('new-scene-characters', []);
     setViewMode('list');
     populateSearchFilters();
     renderMovie();

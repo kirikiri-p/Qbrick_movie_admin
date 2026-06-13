@@ -7,7 +7,8 @@ import { updateMovie } from './firebase.js';
 import { closeSceneDetail } from './nav.js';
 import {
   addDateInput, addCostumeInput, addPropInput,
-  collectDatesFromContainer, collectItemsFromDOM
+  collectDatesFromContainer, collectItemsFromDOM,
+  renderCharacterCheckboxes, collectCharactersFromDOM
 } from './items.js';
 import { showToast } from './toast.js';
 
@@ -43,8 +44,31 @@ export function renderSceneViewDetail() {
     }
   }
 
+  renderCharacterView('view-scene-characters', scene);
   renderItemList('view-scene-costumes', '衣装', scene.costumes);
   renderItemList('view-scene-props', '小道具', scene.props);
+}
+
+// 閲覧パネルの登場人物表示。役者名は映画の登録情報（movie.cast）から補う。
+function renderCharacterView(elementId, scene) {
+  const container = document.getElementById(elementId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const characters = scene.characters || [];
+  if (characters.length === 0) return;
+
+  const movie = state.movies.find((m) => m.id === state.currentMovieId);
+  const actorOf = {};
+  ((movie && movie.cast) || []).forEach((c) => { if (c.character) actorOf[c.character] = c.actor || ''; });
+
+  let html = `<strong style="color: var(--text-color);">登場人物</strong><br>`;
+  characters.forEach((name) => {
+    const actor = actorOf[name];
+    const label = actor ? `${name}（${actor}）` : name;
+    html += `<span class="character-badge">🎭 ${escapeHtml(label)}</span>`;
+  });
+  container.innerHTML = html;
 }
 
 function renderItemList(elementId, label, items) {
@@ -109,6 +133,16 @@ export function renderSceneEditDetail() {
     addDateInput('edit-scene-dates');
   }
 
+  renderCharacterCheckboxes('edit-scene-characters', scene.characters || []);
+  const charList = document.getElementById('edit-scene-characters');
+  const updateCharCount = () => {
+    const n = charList.querySelectorAll('.character-checkbox:checked').length;
+    const el = document.getElementById('edit-character-count');
+    if (el) el.textContent = `（${n}件）`;
+  };
+  charList.onchange = updateCharCount; // 再描画ごとに上書きするので多重登録にならない
+  updateCharCount();
+
   const cList = document.getElementById('edit-costume-list');
   cList.innerHTML = '';
   (scene.costumes || []).forEach((c) => addCostumeInput('edit-costume-list', c));
@@ -127,6 +161,7 @@ export function openSceneEdit() {
 
   // 開くたびにアコーディオンを初期状態に戻す（基本情報のみ展開）
   document.getElementById('edit-acc-basic')?.setAttribute('open', 'true');
+  document.getElementById('edit-acc-character')?.removeAttribute('open');
   document.getElementById('edit-acc-costume')?.removeAttribute('open');
   document.getElementById('edit-acc-prop')?.removeAttribute('open');
 
@@ -152,6 +187,7 @@ export async function saveEditedScene() {
     location: document.getElementById('edit-scene-location').value,
     memo: document.getElementById('edit-scene-memo').value.trim(),
     dates: collectDatesFromContainer('edit-scene-dates'),
+    characters: collectCharactersFromDOM('edit-scene-characters'),
     costumes: collectItemsFromDOM('edit-costume-list'),
     props: collectItemsFromDOM('edit-prop-list'),
     updatedAt: getNowFormattedString()

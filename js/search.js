@@ -1,6 +1,6 @@
 // シーン検索画面。
 import { state } from './state.js';
-import { createSceneCard, getUniqueItemNames } from './movie.js';
+import { createSceneCard, getUniqueItemNames, getUniqueCharacterNames } from './movie.js';
 
 function getUniqueProperties(movie, propName) {
   const items = new Set();
@@ -29,10 +29,11 @@ export function populateSearchFilters() {
   const numSel = document.getElementById('search-number');
   const locSel = document.getElementById('search-location');
   const dateSel = document.getElementById('search-date');
+  const charSel = document.getElementById('search-character');
   const cosSel = document.getElementById('search-costume');
   const propSel = document.getElementById('search-prop');
 
-  [numSel, locSel, dateSel, cosSel, propSel].forEach((s) => {
+  [numSel, locSel, dateSel, charSel, cosSel, propSel].forEach((s) => {
     const currentVal = s.value;
     s.innerHTML = '<option value="">すべて</option>';
     s.dataset.current = currentVal;
@@ -42,10 +43,11 @@ export function populateSearchFilters() {
   getUniqueProperties(movie, 'number').forEach((v) => numSel.add(new Option(v, v)));
   getUniqueProperties(movie, 'location').forEach((v) => locSel.add(new Option(v, v)));
   getUniqueProperties(movie, 'dates').forEach((v) => dateSel.add(new Option(v, v)));
+  getUniqueCharacterNames(movie).forEach((v) => charSel.add(new Option(v, v)));
   getUniqueItemNames(movie, 'costumes').forEach((v) => cosSel.add(new Option(v, v)));
   getUniqueItemNames(movie, 'props').forEach((v) => propSel.add(new Option(v, v)));
 
-  [numSel, locSel, dateSel, cosSel, propSel].forEach((s) => {
+  [numSel, locSel, dateSel, charSel, cosSel, propSel].forEach((s) => {
     if (s.dataset.current) s.value = s.dataset.current;
   });
 }
@@ -56,13 +58,14 @@ export function restoreSearchFilters() {
   set('search-number', f.number);
   set('search-location', f.location);
   set('search-date', f.date);
+  set('search-character', f.character);
   set('search-costume', f.costume);
   set('search-prop', f.prop);
   renderSearchResults();
 }
 
 export function clearSearch(doRender = true) {
-  ['number', 'location', 'date', 'costume', 'prop'].forEach((id) => {
+  ['number', 'location', 'date', 'character', 'costume', 'prop'].forEach((id) => {
     document.getElementById('search-' + id).value = '';
   });
   if (doRender) renderSearchResults();
@@ -81,14 +84,15 @@ export function renderSearchResults() {
   const filterNum = document.getElementById('search-number').value;
   const filterLoc = document.getElementById('search-location').value;
   const filterDate = document.getElementById('search-date').value;
+  const filterChar = document.getElementById('search-character').value;
   const filterCos = document.getElementById('search-costume').value;
   const filterProp = document.getElementById('search-prop').value;
 
   state.lastSearchFilters = {
-    number: filterNum, location: filterLoc, date: filterDate, costume: filterCos, prop: filterProp
+    number: filterNum, location: filterLoc, date: filterDate, character: filterChar, costume: filterCos, prop: filterProp
   };
 
-  if (!filterNum && !filterLoc && !filterDate && !filterCos && !filterProp) {
+  if (!filterNum && !filterLoc && !filterDate && !filterChar && !filterCos && !filterProp) {
     list.innerHTML = '<p class="scene-info">検索条件を選択してください</p>';
     return;
   }
@@ -104,6 +108,7 @@ export function renderSearchResults() {
     if (filterDate === '未定') displayScenes = displayScenes.filter((s) => !s.dates || s.dates.length === 0);
     else displayScenes = displayScenes.filter((s) => s.dates && s.dates.includes(filterDate));
   }
+  if (filterChar) displayScenes = displayScenes.filter((s) => (s.characters || []).includes(filterChar));
   if (filterCos) displayScenes = displayScenes.filter((s) => (s.costumes || []).some((c) => c.name === filterCos));
   if (filterProp) displayScenes = displayScenes.filter((s) => (s.props || []).some((p) => p.name === filterProp));
 
