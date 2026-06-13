@@ -268,6 +268,11 @@ body.dark-mode .view-toggles button.active { background-color: #333; color: #fff
 .edit-action-bar button.secondary { flex: 1; }
 .edit-action-bar .save-btn { flex: 2; background-color: #2e7d32; border-color: #2e7d32; color: #fff; }
 
+/* 🌟 登場人物・配役の入力行 */
+.cast-input-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.cast-input-row .cast-char { flex: 1.2; margin: 0; }
+.cast-input-row .cast-actor { flex: 1; margin: 0; }
+
 /* 🌟 設定モーダル（日々スケジュール作成など） */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 1500; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; }
 .modal-box { width: 100%; max-width: 440px; max-height: calc(100vh - 32px); overflow-y: auto; margin-bottom: 0; }

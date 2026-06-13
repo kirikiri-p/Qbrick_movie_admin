@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <!-- キャッシュ強制クリア用バージョン -->
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 
@@ -79,10 +79,16 @@
 
       <label class="input-label">年度</label>
       <input type="number" id="movie-detail-year" placeholder="例: 2026">
-
-      <button style="background-color: #2e7d32; border-color: #2e7d32; margin-top: 24px;" id="btn-save-movie-details">更新して一覧に戻る</button>
     </div>
 
+    <div class="card card-no-click">
+      <h3 style="color: var(--accent-color);">登場人物・配役</h3>
+      <p class="scene-info" style="margin-top:0;">ここで登録した登場人物が、日々スケジュールのキャスト欄に自動で記入されます。役者名は任意です。</p>
+      <div id="movie-detail-cast"></div>
+      <button type="button" class="secondary" id="btn-add-cast">＋ 登場人物を追加</button>
+    </div>
+
+    <button style="background-color: #2e7d32; border-color: #2e7d32;" id="btn-save-movie-details">更新して一覧に戻る</button>
     <button class="danger" id="btn-delete-movie-details">この映画を完全に削除する</button>
   </div>
 
@@ -295,6 +301,6 @@
 </div>
 
 <!-- 分割したモジュールの起点（main.jsが他のモジュールをimportする） -->
-<script type="module" src="js/main.js?v=10"></script>
+<script type="module" src="js/main.js?v=11"></script>
 </body>
 </html>
