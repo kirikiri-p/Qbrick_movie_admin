@@ -1,3 +1,4 @@
+// シーン詳細パネル（閲覧 / 編集）。
 import { state } from './state.js';
 import {
   escapeHtml, safeStatus, linkify, getNowFormattedString, syncItemStatuses
@@ -11,6 +12,7 @@ import {
 } from './items.js';
 import { showToast } from './toast.js';
 
+// ---- 閲覧パネル ------------------------------------------------------------
 export function renderSceneViewDetail() {
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   const scene = movie?.scenes.find((s) => s.id === state.currentSceneId);
@@ -47,6 +49,7 @@ export function renderSceneViewDetail() {
   renderItemList('view-scene-props', '小道具', scene.props);
 }
 
+// 閲覧パネルの登場人物表示。役者名は映画の登録情報（movie.cast）から補う。
 function renderCharacterView(elementId, scene) {
   const container = document.getElementById(elementId);
   if (!container) return;
@@ -88,6 +91,9 @@ function renderItemList(elementId, label, items) {
   container.innerHTML = html;
 }
 
+// ---- 編集パネル ------------------------------------------------------------
+
+// 衣装・小道具アコーディオンの見出しに件数を表示し、枠の追加・削除に自動で追従させる
 let editCountObserversReady = false;
 function updateEditCounts() {
   const c = document.querySelectorAll('#edit-costume-list .item-input-block').length;
@@ -134,7 +140,7 @@ export function renderSceneEditDetail() {
     const el = document.getElementById('edit-character-count');
     if (el) el.textContent = `（${n}件）`;
   };
-  charList.onchange = updateCharCount;
+  charList.onchange = updateCharCount; // 再描画ごとに上書きするので多重登録にならない
   updateCharCount();
 
   const cList = document.getElementById('edit-costume-list');
@@ -153,6 +159,7 @@ export function openSceneEdit() {
   document.getElementById('detail-pane-view').classList.add('hidden');
   document.getElementById('detail-pane-edit').classList.remove('hidden');
 
+  // 開くたびにアコーディオンを初期状態に戻す（基本情報のみ展開）
   document.getElementById('edit-acc-basic')?.setAttribute('open', 'true');
   document.getElementById('edit-acc-character')?.removeAttribute('open');
   document.getElementById('edit-acc-costume')?.removeAttribute('open');
@@ -160,6 +167,7 @@ export function openSceneEdit() {
 
   renderSceneEditDetail();
 
+  // パネルの先頭から編集を始められるようにスクロール位置を戻す
   document.getElementById('detail-pane')?.scrollTo?.(0, 0);
 }
 
@@ -185,6 +193,8 @@ export async function saveEditedScene() {
     updatedAt: getNowFormattedString()
   };
 
+  // 保存成功後はonSnapshot経由で最新データが届き、自動で再描画される。
+  // 失敗時は編集パネルが開いたままになるので、そのまま再試行できる。
   await updateMovie(state.currentMovieId, (data) => {
     const scene = data.scenes.find((s) => s.id === sceneId);
     if (!scene) return false;

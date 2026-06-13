@@ -1,13 +1,20 @@
+// 共通ユーティリティ。DOMにもFirebaseにも依存しない純粋な関数のみ。
+
+// ---- セキュリティ: HTMLエスケープ --------------------------------------
+// ユーザー入力（シーン名・場所・メモ・衣装名など）をinnerHTMLに埋め込む前に必ず通す。
+// これにより「<」や「"」を含む入力で表示が壊れる/スクリプトが注入される問題を防ぐ。
 const ESCAPE_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ESCAPE_MAP[c]);
 }
 
+// ステータスはCSSクラス名にも使うため、既知の値だけを通す（クラス属性への注入防止）
 export const ITEM_STATUSES = ['未着手', '準備中', '準備完了', '使用済み'];
 export function safeStatus(status) {
   return ITEM_STATUSES.includes(status) ? status : '未着手';
 }
 
+// メモ内のURLをリンク化する。先にエスケープしてから置換するので安全。
 export function linkify(text) {
   if (!text) return '';
   const escaped = escapeHtml(text);
@@ -16,12 +23,16 @@ export function linkify(text) {
   );
 }
 
+// ---- 日付 ----------------------------------------------------------------
 export function getNowFormattedString() {
   const now = new Date();
   const p = (n) => ('0' + n).slice(-2);
   return `${now.getFullYear()}/${p(now.getMonth() + 1)}/${p(now.getDate())} ${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`;
 }
 
+// あらゆる表記の日付文字列を「YYYY-MM-DD」へ正規化する。
+// 例: 2026/1/5, 2026-1-5, 2026年1月5日 → 2026-01-05
+// 解釈できない文字列はそのまま返す（データを壊さない）。
 export function normalizeDateStr(value) {
   if (!value) return '';
   const s = String(value).trim();
@@ -30,6 +41,7 @@ export function normalizeDateStr(value) {
   return `${m[1]}-${('0' + m[2]).slice(-2)}-${('0' + m[3]).slice(-2)}`;
 }
 
+// Excelのシリアル値・文字列日付を YYYY-MM-DD に変換
 export function parseExcelDate(serial) {
   if (!serial && serial !== 0) return '';
   if (typeof serial === 'number') {
@@ -48,6 +60,8 @@ export function migrateMovieData(data) {
   return data;
 }
 
+// ---- データ移行 -----------------------------------------------------------
+// 古い形式のシーンデータを現行形式へ変換しつつ、日付も正規化する。
 export function migrateSceneData(scene) {
   if (scene.date && !scene.dates) { scene.dates = [scene.date]; } else if (!scene.dates) { scene.dates = []; }
   scene.dates = scene.dates.map(normalizeDateStr).filter((d) => d);
@@ -80,6 +94,7 @@ export function migrateSceneData(scene) {
   return scene;
 }
 
+// ---- 共通の集計ロジック ----------------------------------------------------
 export function getSceneOverallStatus(scene) {
   const items = [...(scene.costumes || []), ...(scene.props || [])];
   if (items.length === 0) return 'none';
@@ -94,6 +109,8 @@ export function getSceneOverallStatus(scene) {
   return 'none';
 }
 
+// 同名アイテムのステータス・詳細・金額を全シーンに同期する。
+// （注意: data は Firestore から読み直した最新の映画データを渡すこと）
 export function syncItemStatuses(movieData, updatedItems, typeKey) {
   updatedItems.forEach((updatedItem) => {
     (movieData.scenes || []).forEach((scene) => {
@@ -109,6 +126,7 @@ export function syncItemStatuses(movieData, updatedItems, typeKey) {
   });
 }
 
+// ---- 参加フラグ（端末ローカル） --------------------------------------------
 export function getParticipation(movieId) {
   return localStorage.getItem('part_' + movieId) === 'true';
 }

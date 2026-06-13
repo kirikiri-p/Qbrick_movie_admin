@@ -8,8 +8,7 @@
 <link rel="icon" href="Qbrick_icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<!-- キャッシュ強制クリア用バージョン -->
-<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
 
@@ -53,6 +52,8 @@
     <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
       <button id="editor-toggle-btn" class="secondary" style="width: auto; font-size: 13px; color: var(--muted-text); border: 1px solid var(--border-color);">編集者モードになる</button>
     </div>
+
+    <div class="app-version">ver. 14</div>
   </div>
 
   <div id="view-movie-details" class="container hidden">
@@ -75,7 +76,8 @@
       </select>
 
       <label class="input-label">監督</label>
-      <input type="text" id="movie-detail-director" placeholder="監督名">
+      <div id="movie-detail-directors"></div>
+      <button type="button" class="secondary" id="btn-add-director">＋ 監督を追加</button>
 
       <label class="input-label">年度</label>
       <input type="number" id="movie-detail-year" placeholder="例: 2026">
@@ -276,7 +278,6 @@
   </div>
 </div>
 
-<!-- 日々スケジュール作成モーダル -->
 <div id="callsheet-modal" class="modal-overlay hidden">
   <div class="modal-box card card-no-click">
     <h3 id="cs-date-label">日々スケジュール</h3>
@@ -312,7 +313,6 @@
   </div>
 </div>
 
-<!-- 分割したモジュールの起点（main.jsが他のモジュールをimportする） -->
-<script type="module" src="js/main.js?v=13"></script>
+<script type="module" src="js/main.js?v=14"></script>
 </body>
 </html>

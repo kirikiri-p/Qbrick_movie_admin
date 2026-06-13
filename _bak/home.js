@@ -1,3 +1,4 @@
+// ホーム画面: 映画一覧（撮影進捗率つき）と参加中スケジュールのカレンダー。
 import { state } from './state.js';
 import {
   escapeHtml, getParticipation, setParticipation, getSceneOverallStatus
@@ -38,6 +39,7 @@ export function renderHome() {
     if (movie.year) detailText += ` ｜ ${escapeHtml(movie.year)}年`;
     const icon = escapeHtml(movie.icon || '🎬');
 
+    // ★新機能: 撮影進捗率（撮影済みシーン数 / 全シーン数）
     const totalScenes = movie.scenes.length;
     const shotScenes = movie.scenes.filter((s) => s.status === '撮影済み').length;
     const progressPct = totalScenes > 0 ? Math.round((shotScenes / totalScenes) * 100) : 0;
@@ -120,7 +122,7 @@ export function renderGlobalCalendar() {
     const td = document.createElement('td');
 
     const dateStr = `${state.globalCalYear}-${('0' + (state.globalCalMonth + 1)).slice(-2)}-${('0' + day).slice(-2)}`;
-
+    // 日付は保存時に正規化済みなので、完全一致だけで判定できる
     const dayScenes = activeScenes.filter((item) => item.scene.dates && item.scene.dates.includes(dateStr));
 
     if (dayScenes.length > 0) {
@@ -130,7 +132,7 @@ export function renderGlobalCalendar() {
 
       const icons = new Set();
       dayScenes.forEach((item) => icons.add(item.movie.icon || '🎬'));
-
+      // セルからあふれないように絵文字は2つまでに抑える
       const iconArr = Array.from(icons);
       const iconText = iconArr.slice(0, 2).join('') + (iconArr.length > 2 ? '…' : '');
 
@@ -142,6 +144,7 @@ export function renderGlobalCalendar() {
       const dotContainer = document.createElement('div');
       dotContainer.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-start; margin-top:4px;';
 
+      // ドットも上限を設けて、超過分は「+n」でまとめる
       const MAX_DOTS = 6;
       dayScenes.slice(0, MAX_DOTS).forEach((item) => {
         let overall = getSceneOverallStatus(item.scene);

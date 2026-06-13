@@ -1,3 +1,7 @@
+// 日々スケジュール（香盤表）のたたき台生成。
+// 日別画面のシーンから撮影順序とタイムテーブルを組み立て、
+// リポジトリ内のテンプレート(daily_schedule_template.xlsx)に書き込んでダウンロードする。
+// テンプレートの書式を保持するため、生成時にExcelJSを遅延読み込みして使う。
 import { state } from './state.js';
 import { getParticipation } from './utils.js';
 import { showToast } from './toast.js';
@@ -5,12 +9,14 @@ import { showToast } from './toast.js';
 const TEMPLATE_PATH = 'daily_schedule_template.xlsx';
 const EXCELJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
 
+// テンプレート上の本表エリア（時間×場所×S#×場面…）は8〜37行目の30行
 const TABLE_FIRST_ROW = 8;
 const TABLE_ROW_COUNT = 30;
 
-const LOAD_MIN = 15;
-const WRAPUP_MIN = 30;
+const LOAD_MIN = 15;     // 集合〜出発（機材詰込み）の想定時間
+const WRAPUP_MIN = 30;   // 撮影終了〜解散（片付け）の想定時間
 
+// ---- 日の出・日の入（熊本基準のNOAA系近似計算、誤差±1分程度） ----------------
 export function calcSunTimes(dateStr, lat = 32.79, lon = 130.74) {
   const [y, m, d] = dateStr.split('-').map(Number);
   const N = Math.floor((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 1)) / 86400000) + 1;
@@ -34,7 +40,7 @@ export function calcSunTimes(dateStr, lat = 32.79, lon = 130.74) {
     H /= 15;
     const T = H + RA - (0.06571 * t) - 6.622;
     const UT = ((T - lngHour) % 24 + 24) % 24;
-    const local = (UT + 9) % 24;
+    const local = (UT + 9) % 24; // JST
     let hh = Math.floor(local);
     let mm = Math.round((local - hh) * 60);
     if (mm === 60) { hh += 1; mm = 0; }
@@ -44,6 +50,7 @@ export function calcSunTimes(dateStr, lat = 32.79, lon = 130.74) {
   return { sunrise: calc(true), sunset: calc(false) };
 }
 
+// ---- 時刻ヘルパー -----------------------------------------------------------
 function toMin(hhmm) {
   const [h, m] = String(hhmm).split(':').map(Number);
   return (h || 0) * 60 + (m || 0);
@@ -57,6 +64,10 @@ function fmtRange(start, end) {
   return `${fmtMin(start)}-${fmtMin(end)}`;
 }
 
+// ---- 撮影順序の決定 -----------------------------------------------------------
+// 時間帯 M(朝)→D(昼)→未設定→E(夕)→N(夜) の順。
+// 同じ時間帯の中では同じ場所のシーンをまとめ、直前の場所から続けられる場合は
+// その場所を先頭にして移動回数を最小化する。
 const ZONE_ORDER = { 'M': 0, 'D': 1, '': 2, 'E': 3, 'N': 4 };
 
 export function orderScenesForShoot(scenes) {
@@ -75,6 +86,7 @@ export function orderScenesForShoot(scenes) {
     const zoneScenes = byZone.get(z)
       .sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, { numeric: true, sensitivity: 'base' }));
 
+    // 場所ごとにグループ化（シーン番号順の初出順を維持）
     const groups = new Map();
     zoneScenes.forEach((s) => {
       const loc = s.location || '';
@@ -83,7 +95,7 @@ export function orderScenesForShoot(scenes) {
     });
 
     let locs = Array.from(groups.keys());
-
+    // 直前の場所と同じグループがあれば先頭に持ってくる（時間帯をまたぐ移動を節約）
     if (prevLocation !== null && groups.has(prevLocation)) {
       locs = [prevLocation, ...locs.filter((l) => l !== prevLocation)];
     }
@@ -97,6 +109,9 @@ export function orderScenesForShoot(scenes) {
   return ordered;
 }
 
+// ---- タイムテーブルの組み立て ---------------------------------------------------
+// 戻り値: { rows, shootStart, shootEnd }
+// row: { time, location, number, name, zone, memo } もしくは { time, name }（定型行）
 export function buildTimeline(scenes, settings) {
   const ordered = orderScenesForShoot(scenes);
   const rows = [];
@@ -152,6 +167,7 @@ export function buildTimeline(scenes, settings) {
   return { rows, shootStart: shootStart ?? toMin(settings.meetTime), shootEnd };
 }
 
+// ---- ExcelJSの遅延読み込み ------------------------------------------------------
 let excelJsPromise = null;
 function loadExcelJS() {
   if (window.ExcelJS) return Promise.resolve();
@@ -170,10 +186,11 @@ function loadExcelJS() {
   return excelJsPromise;
 }
 
+// ---- ダイアログの開閉 ------------------------------------------------------------
 let dialogDate = null;
 
 function getDailyMovies(dateStr) {
-
+  // その日に撮影予定シーンがある参加中の映画
   return state.movies.filter((m) =>
     getParticipation(m.id) && m.scenes.some((s) => s.dates && s.dates.includes(dateStr))
   );
@@ -203,6 +220,7 @@ export function closeCallsheetDialog() {
   document.getElementById('callsheet-modal').classList.add('hidden');
 }
 
+// ---- 生成本体 --------------------------------------------------------------------
 export async function generateCallsheet() {
   if (!dialogDate) return;
 
@@ -228,7 +246,7 @@ export async function generateCallsheet() {
   }
 
   try {
-
+    // テンプレートとExcelJSを並行で取得
     const [templateBuf] = await Promise.all([
       fetch(TEMPLATE_PATH).then((r) => {
         if (!r.ok) throw new Error('テンプレートの取得に失敗: ' + r.status);
@@ -244,24 +262,29 @@ export async function generateCallsheet() {
     await workbook.xlsx.load(templateBuf);
     const ws = workbook.worksheets[0];
 
+    // ---- 上部ヘッダー ----
     const [y, m, d] = dialogDate.split('-').map(Number);
     const weekday = ['日', '月', '火', '水', '木', '金', '土'][new Date(y, m - 1, d).getDay()];
     const dayPart = settings.dayNum ? `　Day${settings.dayNum}` : '';
     ws.getCell('B2').value = `Qbrick　映画「${movie.title}」日々スケジュール${dayPart}`;
     ws.getCell('B3').value = ` ${m}月${d}日（${weekday}）`;
     if (settings.meetPlace) {
-      ws.getCell('G4').value = settings.meetPlace;
-      ws.getCell('L4').value = settings.meetPlace;
+      ws.getCell('G4').value = settings.meetPlace; // 集合場所
+      ws.getCell('L4').value = settings.meetPlace; // 機材場所（集合場所と同じ場所を記入）
     }
-    ws.getCell('U4').value = fmtMin(toMin(settings.meetTime));
-    ws.getCell('V4').value = fmtMin(shootStart);
-    ws.getCell('X4').value = fmtMin(shootEnd);
-    ws.getCell('AB4').value = sun.sunrise;
-    ws.getCell('AB5').value = sun.sunset;
+    ws.getCell('U4').value = fmtMin(toMin(settings.meetTime)); // スタッフ集合時間
+    ws.getCell('V4').value = fmtMin(shootStart);               // 撮影開始時間
+    ws.getCell('X4').value = fmtMin(shootEnd);                 // 撮影終了予定時間
+    ws.getCell('AB4').value = sun.sunrise;                     // 日の出
+    ws.getCell('AB5').value = sun.sunset;                      // 日の入
 
-    const CHAR_FIRST_COL = 12;
-    const CHAR_COL_COUNT = 9;
-    const colLetter = (n) => String.fromCharCode(64 + n);
+    // ---- 登場人物の○列（テンプレ中央の空き列 L〜T の最大9列） ----
+    // 画像のように、各シーン行にその場に出る登場人物を○で示す。
+    // 列見出しはその日に出る登場人物を、映画の登録順(movie.cast)を優先して並べる。
+    // ※ J列=CUT・K列=PAGE は手書き欄なので避け、L列以降を使う。
+    const CHAR_FIRST_COL = 12; // L列
+    const CHAR_COL_COUNT = 9;  // L〜T列
+    const colLetter = (n) => String.fromCharCode(64 + n); // 12→'L' … 20→'T'
 
     const dayCharSet = new Set();
     scenes.forEach((s) => (s.characters || []).forEach((c) => dayCharSet.add(c)));
@@ -273,21 +296,25 @@ export async function generateCallsheet() {
     const usedCharColumns = charColumns.slice(0, CHAR_COL_COUNT);
     const charColIndex = new Map(usedCharColumns.map((name, i) => [name, CHAR_FIRST_COL + i]));
 
+    // 列見出し（L6〜T6）。H/I/J/K（L/S・D/N・CUT・PAGE）と同じ縦書きヘッダーに合わせる。
     usedCharColumns.forEach((name, i) => {
       const L = colLetter(CHAR_FIRST_COL + i);
-      try { ws.mergeCells(`${L}6:${L}7`); } catch (e) {  }
+      try { ws.mergeCells(`${L}6:${L}7`); } catch (e) { /* 既に結合済みなら無視 */ }
       const cell = ws.getCell(`${L}6`);
       cell.value = name;
       cell.alignment = { textRotation: 255, horizontal: 'center', vertical: 'top', wrapText: true };
     });
 
+    // その日の登場人物の人数に合わせて、使わない○列（右端まで）を非表示にする。
+    // これで備考から右の欄が使った人数のすぐ右に詰まって表示される。
     if (usedCharColumns.length >= 1) {
       for (let col = CHAR_FIRST_COL + usedCharColumns.length; col <= 20; col++) {
         ws.getColumn(col).hidden = true;
       }
     }
 
-    const GREY = { argb: 'FF8C8C8C' };
+    // ---- 本表（時間 / 場所 / S# / 場面 / D/N / 登場人物○ / 備考） ----
+    const GREY = { argb: 'FF8C8C8C' }; // 撮影以外の行（集合・移動・休憩など）の文字色
     const writable = Math.min(rows.length, TABLE_ROW_COUNT);
     for (let i = 0; i < writable; i++) {
       const r = TABLE_FIRST_ROW + i;
@@ -298,7 +325,7 @@ export async function generateCallsheet() {
         ws.getCell(`D${r}`).value = row.number ?? '';
         ws.getCell(`E${r}`).value = row.name || '';
         ws.getCell(`I${r}`).value = row.zone || '';
-
+        // その場に出る登場人物の列に○を立てる
         (row.characters || []).forEach((name) => {
           const ci = charColIndex.get(name);
           if (ci) {
@@ -310,7 +337,8 @@ export async function generateCallsheet() {
         if (row.memo) ws.getCell(`U${r}`).value = row.memo;
       } else {
         ws.getCell(`E${r}`).value = row.name || '';
-
+        // 撮影以外の行は時刻と内容をグレーにして、撮影行を目立たせる
+        // （テンプレートのフォント名・サイズは引き継いで色だけ上書き）
         ['B', 'E'].forEach((col) => {
           const cell = ws.getCell(`${col}${r}`);
           cell.font = { ...(cell.font || {}), color: GREY };
@@ -321,18 +349,25 @@ export async function generateCallsheet() {
       ws.getCell(`E${TABLE_FIRST_ROW + TABLE_ROW_COUNT - 1}`).value = '※行数が足りないため以降は省略（シーン数を確認してください）';
     }
 
+    // ---- キャスト欄（その映画の登場人物全員を「役名/出演者」に記入） ----
+    // ヘッダはY6:Z7。データ行はY8〜Y23の16行ぶん。
     const CAST_FIRST_ROW = 8;
     const CAST_ROW_COUNT = 16;
     const castList = movie.cast || [];
     castList.slice(0, CAST_ROW_COUNT).forEach((c, i) => {
       const r = CAST_FIRST_ROW + i;
-
+      // 「登場人物（役者）」の形。役者未登録なら登場人物名のみ。
       ws.getCell(`Y${r}`).value = c.actor ? `${c.character}（${c.actor}）` : c.character;
     });
     if (castList.length > CAST_ROW_COUNT) {
       ws.getCell(`Y${CAST_FIRST_ROW + CAST_ROW_COUNT - 1}`).value = '※人数が多いため一部省略';
     }
 
+    // ---- 部署割 ----
+    // 監督名はアプリ登録から自動。他部署は空欄を用意して現場で記入。
+    // ★書き込み先セル: テンプレに「部署割」専用の枠（罫線で作った実セル。図形は不可）を
+    //   用意し、その枠の左上セル番地を DEPT_CELL に設定する。
+    //   結合セルなら左上セルを指定すること。未使用にしたい場合は DEPT_CELL = null。
     const DEPT_CELL = 'B6';
     const directorText = (movie.directors || []).filter(Boolean).join('、');
     if (DEPT_CELL) {
@@ -352,6 +387,7 @@ export async function generateCallsheet() {
       ws.getCell('V39').value = `監督：${directorText}`;
     }
 
+    // ---- ダウンロード ----
     const outBuf = await workbook.xlsx.writeBuffer();
     const blob = new Blob([outBuf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);

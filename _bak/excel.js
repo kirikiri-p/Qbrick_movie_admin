@@ -1,3 +1,9 @@
+// Excel インポート / エクスポート。
+// ポイント: 衣装・小道具の複数項目を1セルにまとめる際の区切り文字をカンマから「|」に変更。
+// 「1,500円」のようにカンマを含む値があっても列の対応がズレなくなった。
+// インポート時はセルに「|」が含まれていれば新形式、なければ旧形式（カンマ区切り）として
+// 自動判別するので、過去にエクスポートしたファイルもそのまま読み込める。
+/* global XLSX */
 import { state } from './state.js';
 import { parseExcelDate, getNowFormattedString, safeStatus } from './utils.js';
 import { createMovie } from './firebase.js';
@@ -5,6 +11,7 @@ import { showToast } from './toast.js';
 
 const DELIMITER = '|';
 
+// 新旧形式を自動判別して分割
 function splitCell(value) {
   if (value === undefined || value === null || value === '') return [];
   const s = String(value);
@@ -12,6 +19,7 @@ function splitCell(value) {
   return s.split(delim);
 }
 
+// 「登場人物（役者）」表記を分解する。全角・半角どちらの括弧にも対応。役者は任意。
 function parseCharEntry(entry) {
   const t = String(entry).trim();
   const m = t.match(/^(.*?)[（(](.*)[）)]\s*$/);
@@ -33,7 +41,7 @@ export function handleExcelUpload(event) {
       const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       const rows = json.slice(1);
       const newScenes = [];
-
+      // 登場人物（役者）を全シーンから集約して配役登録（movie.cast）を復元する
       const castMap = new Map();
 
       rows.forEach((row, index) => {
@@ -68,12 +76,13 @@ export function handleExcelUpload(event) {
           price: (pPrices[i] || '').trim()
         })).filter((p) => p.name);
 
+        // 追加列（13列目以降）。旧形式ファイルでは undefined になり、既定値で扱う。
         const status = String(row[12] ?? '').trim() === '撮影済み' ? '撮影済み' : '未撮影';
         const timeZone = String(row[13] ?? '').trim();
         const memo = String(row[14] ?? '');
         const charEntries = splitCell(row[15]).map(parseCharEntry).filter((e) => e.character);
         const characters = charEntries.map((e) => e.character);
-
+        // 配役登録の復元用に集約（役者名は非空のものを優先して採用）
         charEntries.forEach((e) => {
           if (!castMap.has(e.character) || (!castMap.get(e.character) && e.actor)) {
             castMap.set(e.character, e.actor);
@@ -114,6 +123,9 @@ export function exportToExcel() {
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   if (!movie) return;
 
+  // 先頭12列は従来どおり（過去のテンプレ・旧ファイルとの互換維持）。
+  // 13列目以降に「撮影ステータス・時間帯・メモ・登場人物」を追加し、
+  // エクスポート→再インポートで全情報が復元されるようにする。
   const aoa = [[
     'シーン番号', '撮影日', 'シーン名', '場所',
     '衣装ステータス', '衣装名', '衣装詳細', '金額/メモ',
@@ -121,6 +133,7 @@ export function exportToExcel() {
     '撮影ステータス', '時間帯', 'メモ', '登場人物'
   ]];
 
+  // 登場人物名→役者名（配役登録から補完し「名前（役者）」形式で書き出す）
   const actorOf = {};
   (movie.cast || []).forEach((c) => { if (c.character) actorOf[c.character] = c.actor || ''; });
 

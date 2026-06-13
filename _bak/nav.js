@@ -1,3 +1,5 @@
+// 画面遷移（location.hash の書き換え）だけを担当する小さなモジュール。
+// 実際の描画は router.js が hashchange を受けて行う。
 import { state } from './state.js';
 
 export function goHome() { window.location.hash = 'home'; }
@@ -19,7 +21,7 @@ export function goScene(sceneId, forceMovieId = null) {
   const currentHash = window.location.hash.replace('#', '');
 
   if (currentHash.startsWith('search/')) {
-
+    // 検索画面から離れる前に、選択中のフィルタを保存しておく
     state.lastSearchFilters.number = document.getElementById('search-number')?.value || '';
     state.lastSearchFilters.location = document.getElementById('search-location')?.value || '';
     state.lastSearchFilters.date = document.getElementById('search-date')?.value || '';

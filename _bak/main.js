@@ -1,3 +1,4 @@
+// エントリーポイント: 初期化・イベントの結線・Firestore購読。
 import { state } from './state.js';
 import { migrateSceneData, migrateMovieData, removeParticipation } from './utils.js';
 import { subscribeMovies, createMovie, updateMovie, deleteMovieDoc } from './firebase.js';
@@ -18,6 +19,7 @@ import { openCallsheetDialog, closeCallsheetDialog, generateCallsheet } from './
 
 const EDITOR_PASSWORD = 'きゅーぶりっく';
 
+// ---- ダークモード（localStorageで永続化） -------------------------------------
 function applyDarkMode(isDark) {
   const btn = document.getElementById('dark-mode-btn');
   document.body.classList.toggle('dark-mode', isDark);
@@ -25,6 +27,7 @@ function applyDarkMode(isDark) {
   localStorage.setItem('darkMode', isDark ? 'true' : 'false');
 }
 
+// ---- 編集者モード -------------------------------------------------------------
 function toggleEditorMode() {
   if (state.isEditorMode) {
     state.isEditorMode = false;
@@ -47,10 +50,11 @@ function toggleEditorMode() {
       return;
     }
   }
-
+  // 現在の画面をハッシュに基づいて再描画する
   handleHash(true);
 }
 
+// ---- 映画の追加・基本情報 -------------------------------------------------------
 async function addMovie() {
   const titleInput = document.getElementById('new-movie-title');
   const title = titleInput.value.trim();
@@ -82,15 +86,18 @@ async function deleteMovieFromDetails() {
   if (!movie) return;
   if (!confirm(`映画「${movie.title}」を本当に削除しますか？`)) return;
   await deleteMovieDoc(state.currentMovieId);
-  removeParticipation(state.currentMovieId);
+  removeParticipation(state.currentMovieId); // 端末に残る参加フラグも掃除する
   showToast('映画を削除しました');
   nav.goHome();
 }
 
+// ---- イベントの結線 -------------------------------------------------------------
 function bind(id, eventName, handler) {
   document.getElementById(id)?.addEventListener(eventName, handler);
 }
 
+// 通信を伴うボタン用の結線。処理中はボタンを無効化して
+// 二度押しによる重複登録・二重保存を防ぐ。
 function bindAsync(id, handler, after = null) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -102,7 +109,7 @@ function bindAsync(id, handler, after = null) {
     try {
       await handler();
     } catch (e) {
-
+      // エラー通知はupdateMovie等の内部で表示済み
     } finally {
       el.textContent = originalText;
       el.disabled = false;
@@ -112,34 +119,40 @@ function bindAsync(id, handler, after = null) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-
+  // ダークモード復元
   applyDarkMode(localStorage.getItem('darkMode') === 'true');
   bind('dark-mode-btn', 'click', () => applyDarkMode(!document.body.classList.contains('dark-mode')));
 
+  // ヘッダー
   document.querySelectorAll('.js-go-home').forEach((el) => el.addEventListener('click', nav.goHome));
   bind('header-movie-title-nav', 'click', nav.scrollToTop);
   bind('header-search-btn', 'click', nav.goSearch);
 
+  // ホーム
   bindAsync('btn-add-movie', addMovie);
   bind('excel-upload', 'change', handleExcelUpload);
   bind('editor-toggle-btn', 'click', toggleEditorMode);
 
+  // 映画の基本情報
   bindAsync('btn-save-movie-details', saveMovieDetails);
   bindAsync('btn-delete-movie-details', deleteMovieFromDetails);
   bind('btn-add-cast', 'click', () => addCastInput('movie-detail-cast'));
   bind('btn-add-director', 'click', () => addDirectorInput('movie-detail-directors'));
 
+  // 検索
   bind('btn-back-search', 'click', nav.backFromSearch);
   bind('btn-clear-search', 'click', () => clearSearch());
   document.querySelectorAll('#search-number, #search-location, #search-date, #search-character, #search-costume, #search-prop')
     .forEach((el) => el.addEventListener('change', renderSearchResults));
 
+  // 映画画面: 新規シーン追加フォーム
   bind('new-scene-number', 'input', checkSceneInput);
   bind('btn-add-date-new', 'click', () => addDateInput('new-scene-dates'));
   bind('btn-add-costume-new', 'click', () => addCostumeInput('new-costume-list'));
   bind('btn-add-prop-new', 'click', () => addPropInput('new-prop-list'));
   bindAsync('add-scene-btn', addScene, checkSceneInput);
 
+  // 映画画面: 一覧の操作
   bind('btn-view-list', 'click', () => setViewMode('list'));
   bind('btn-view-cos', 'click', () => setViewMode('cos'));
   bind('btn-view-prop', 'click', () => setViewMode('prop'));
@@ -147,17 +160,19 @@ document.addEventListener('DOMContentLoaded', () => {
   bindAsync('bulk-delete-btn', deleteSelectedScenes);
   bind('btn-export-excel', 'click', exportToExcel);
 
+  // 日々スケジュール作成（日別画面）
   bind('btn-open-callsheet', 'click', openCallsheetDialog);
   bind('btn-cs-cancel', 'click', closeCallsheetDialog);
   bindAsync('btn-cs-generate', generateCallsheet);
   bind('cs-lunch-enabled', 'change', (e) => {
     document.getElementById('cs-lunch-detail').style.display = e.target.checked ? 'grid' : 'none';
   });
-
+  // オーバーレイ（背景）タップで閉じる
   document.getElementById('callsheet-modal')?.addEventListener('click', (e) => {
     if (e.target.id === 'callsheet-modal') closeCallsheetDialog();
   });
 
+  // シーン詳細パネル
   bind('btn-close-detail', 'click', nav.closeSceneDetail);
   bind('btn-open-edit', 'click', openSceneEdit);
   bind('btn-cancel-edit', 'click', cancelSceneEdit);
@@ -169,13 +184,15 @@ document.addEventListener('DOMContentLoaded', () => {
   bindAsync('btn-delete-scene', deleteScene);
 });
 
+// ---- ルーティング ----------------------------------------------------------------
 window.addEventListener('hashchange', () => handleHash());
 
+// ---- Firestore 購読 ---------------------------------------------------------------
 let isInitialLoad = true;
 subscribeMovies((snapshot) => {
   const loaded = [];
   snapshot.forEach((docSnap) => {
-
+    // 1件壊れたデータがあっても全体が止まらないように個別にtry-catchする
     try {
       const data = migrateMovieData(docSnap.data());
       data.scenes = (Array.isArray(data.scenes) ? data.scenes : []).map(migrateSceneData);

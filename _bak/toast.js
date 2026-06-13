@@ -1,3 +1,5 @@
+// 画面下に出て自動で消えるトースト通知。
+// 保存成功などの軽い通知に使い、alertのように作業を中断させない。
 let container = null;
 
 export function showToast(message) {
@@ -17,6 +19,6 @@ export function showToast(message) {
   setTimeout(() => {
     toast.classList.remove('show');
     toast.addEventListener('transitionend', () => toast.remove(), { once: true });
-    setTimeout(() => toast.remove(), 600);
+    setTimeout(() => toast.remove(), 600); // transitionendが来ない場合の保険
   }, 2200);
 }

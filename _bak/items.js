@@ -1,6 +1,11 @@
+// 動的な入力部品（撮影日・衣装枠・小道具枠・サジェスト）。
+// ポイント: HTML文字列にユーザー入力を埋め込む方式をやめ、
+// DOM要素を組み立てて .value 代入 + addEventListener で扱う。
+// これにより「'」や「"」を含む名前でボタンが壊れるバグを根絶している。
 import { state } from './state.js';
 import { ITEM_STATUSES, safeStatus } from './utils.js';
 
+// 「追加」ボタンの有効/無効（シーン番号が入っていれば押せる）
 export function checkSceneInput() {
   const numInput = document.getElementById('new-scene-number');
   const btn = document.getElementById('add-scene-btn');
@@ -8,11 +13,13 @@ export function checkSceneInput() {
   btn.disabled = (numInput.value.trim() === '');
 }
 
+// ステータスselectの色をかけ直す
 export function updateSelectColor(sel) {
   ITEM_STATUSES.forEach((s) => sel.classList.remove('status-' + s));
   sel.classList.add('status-' + safeStatus(sel.value));
 }
 
+// ---- 撮影日入力 -----------------------------------------------------------
 export function addDateInput(containerId, initDate = null) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -46,6 +53,7 @@ export function collectDatesFromContainer(containerId) {
   return dates;
 }
 
+// ---- 衣装・小道具入力枠 ------------------------------------------------------
 function createItemInputBlock(type, item = null) {
   const id = item ? item.id : Date.now() + Math.random().toString(36).substring(2, 7);
   const status = safeStatus(item ? item.status : '未着手');
@@ -58,6 +66,7 @@ function createItemInputBlock(type, item = null) {
   div.className = 'item-input-block';
   div.dataset.id = id;
 
+  // 構造のみHTMLで作り、ユーザー由来の値は後から .value で安全に流し込む
   div.innerHTML = `
     <button type="button" class="item-remove-btn" title="この枠を消す">✕</button>
     <select class="item-status status-color">
@@ -101,6 +110,7 @@ export function addPropInput(containerId, item = null) {
   document.getElementById(containerId)?.appendChild(createItemInputBlock('prop', item));
 }
 
+// ---- 過去データからのサジェスト ----------------------------------------------
 export function showSuggestions(inputElem, type) {
   const name = inputElem.value.trim();
   const block = inputElem.closest('.item-input-block');
@@ -148,6 +158,7 @@ export function showSuggestions(inputElem, type) {
   });
 }
 
+// 入力枠からアイテム配列を収集
 export function collectItemsFromDOM(containerId) {
   const items = [];
   document.querySelectorAll(`#${containerId} .item-input-block`).forEach((block) => {
@@ -165,6 +176,8 @@ export function collectItemsFromDOM(containerId) {
   return items;
 }
 
+// ---- 登場人物・配役の入力行 ----------------------------------------------------
+// 「登場人物名」と「役者名」のペアを1行で扱う。役者名は空でも可。
 export function addCastInput(containerId, cast = null) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -196,6 +209,10 @@ export function addCastInput(containerId, cast = null) {
   container.appendChild(div);
 }
 
+// ---- シーンへの登場人物の割り当て（チェックボックス） --------------------------
+// その映画に登録済みの登場人物（movie.cast）を選択肢として並べ、
+// シーンに出る人物にチェックを入れる。登録から消えたが既にシーンへ割り当て済みの
+// 名前（selectedNames側にしか無い名前）も選択肢に残し、勝手に消えないようにする。
 export function renderCharacterCheckboxes(containerId, selectedNames = []) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -240,6 +257,7 @@ export function renderCharacterCheckboxes(containerId, selectedNames = []) {
   });
 }
 
+// チェックの入った登場人物名を配列で収集する
 export function collectCharactersFromDOM(containerId) {
   const names = [];
   document.querySelectorAll(`#${containerId} .character-checkbox:checked`).forEach((cb) => {

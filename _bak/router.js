@@ -1,3 +1,4 @@
+// ルーター: location.hash を解釈して各画面を描画する。
 import { state } from './state.js';
 import { getParticipation, escapeHtml } from './utils.js';
 import { renderHome } from './home.js';
@@ -71,7 +72,7 @@ function executeGoMovie(mId, isDataUpdate) {
 
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   if (!movie) {
-
+    // 他の端末で削除された等で映画が見つからない場合はホームへ戻す
     window.location.hash = 'home';
     return;
   }
@@ -101,7 +102,7 @@ function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
   state.currentSceneId = sId;
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   if (!movie) {
-
+    // 他の端末で削除された等で映画が見つからない場合はホームへ戻す
     window.location.hash = 'home';
     return;
   }
@@ -153,7 +154,7 @@ function executeGoSearchScene(sId, mId, isDataUpdate) {
   state.currentSceneId = sId;
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   if (!movie) {
-
+    // 他の端末で削除された等で映画が見つからない場合はホームへ戻す
     window.location.hash = 'home';
     return;
   }
@@ -194,7 +195,7 @@ function executeGoSearch(mId, isDataUpdate = false, preserveFilters = false) {
 
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   if (!movie) {
-
+    // 他の端末で削除された等で映画が見つからない場合はホームへ戻す
     window.location.hash = 'home';
     return;
   }
@@ -220,7 +221,7 @@ function executeGoMovieDetails(mId, isDataUpdate) {
   state.currentMovieId = mId;
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   if (!movie) {
-
+    // 他の端末で削除された等で映画が見つからない場合はホームへ戻す
     window.location.hash = 'home';
     return;
   }
@@ -261,7 +262,7 @@ export function executeGoDaily(dateStr, isDataUpdate, skipRenderIfLoaded = false
   const container = document.getElementById('daily-scene-list-container');
 
   if (skipRenderIfLoaded && container.children.length > 0) {
-
+    // すでに描画済みなのでスキップ
   } else {
     container.innerHTML = '';
     const activeScenes = [];

@@ -1,10 +1,12 @@
+// アプリ全体で共有する状態。
+// 各モジュールは `state.currentMovieId` のようにプロパティ経由で読み書きする。
 export const state = {
   movies: [],
 
   currentMovieId: null,
   currentSceneId: null,
 
-  currentViewMode: 'list',
+  currentViewMode: 'list',   // 'list' | 'cos' | 'prop'
   currentSort: 'num-asc',
 
   selectedSceneIds: new Set(),

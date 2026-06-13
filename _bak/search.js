@@ -1,3 +1,4 @@
+// シーン検索画面。
 import { state } from './state.js';
 import { createSceneCard, getUniqueItemNames, getUniqueCharacterNames } from './movie.js';
 
@@ -38,6 +39,7 @@ export function populateSearchFilters() {
     s.dataset.current = currentVal;
   });
 
+  // new Option(text, value) は内部で textContent を使うためエスケープ不要で安全
   getUniqueProperties(movie, 'number').forEach((v) => numSel.add(new Option(v, v)));
   getUniqueProperties(movie, 'location').forEach((v) => locSel.add(new Option(v, v)));
   getUniqueProperties(movie, 'dates').forEach((v) => dateSel.add(new Option(v, v)));

@@ -1,3 +1,4 @@
+// 映画画面: シーン一覧・シーンカード・衣装/小道具一覧（インベントリ）。
 import { state } from './state.js';
 import {
   escapeHtml, safeStatus, getSceneOverallStatus, getNowFormattedString, syncItemStatuses
@@ -7,6 +8,7 @@ import { goScene } from './nav.js';
 import { collectDatesFromContainer, collectItemsFromDOM, addDateInput, updateSelectColor, checkSceneInput, collectCharactersFromDOM, renderCharacterCheckboxes } from './items.js';
 import { showToast } from './toast.js';
 
+// ---- 表示モード・並べ替え ----------------------------------------------------
 export function setViewMode(mode) {
   state.currentViewMode = mode;
   ['list', 'cos', 'prop'].forEach((id) => {
@@ -39,6 +41,7 @@ export function updateSort(val) {
   renderMovie();
 }
 
+// ---- シーン一覧の描画 --------------------------------------------------------
 export function renderMovie() {
   state.renderedMovieId = state.currentMovieId;
   const scrollY = window.scrollY;
@@ -84,6 +87,7 @@ export function renderMovie() {
   }, 0);
 }
 
+// ---- シーンカード ------------------------------------------------------------
 export function createSceneCard(scene, forceMovieId = null) {
   const div = document.createElement('div');
   div.className = 'card';
@@ -154,6 +158,7 @@ export function createSceneCard(scene, forceMovieId = null) {
 
   div.innerHTML = html;
 
+  // イベントは文字列埋め込みではなくリスナーで安全に紐づける
   div.addEventListener('click', () => goScene(scene.id, forceMovieId));
 
   const checkbox = div.querySelector('.scene-checkbox');
@@ -175,6 +180,7 @@ export function createSceneCard(scene, forceMovieId = null) {
   return div;
 }
 
+// ---- シーン選択・削除 ---------------------------------------------------------
 export function toggleSceneSelection(sceneId, checkbox) {
   if (checkbox.checked) state.selectedSceneIds.add(sceneId);
   else state.selectedSceneIds.delete(sceneId);
@@ -203,13 +209,14 @@ export async function toggleSceneShotStatus(sceneId, checkbox, forceMovieId) {
   const newStatus = checkbox.checked ? '撮影済み' : '未撮影';
   const now = getNowFormattedString();
 
+  // 即時にローカルへ反映してから保存（onSnapshotで再描画される）
   const localMovie = state.movies.find((m) => m.id === movieId);
   const localScene = localMovie?.scenes.find((s) => s.id === sceneId);
   const prevStatus = localScene?.status;
   const prevUpdatedAt = localScene?.updatedAt;
   if (localScene) { localScene.status = newStatus; localScene.updatedAt = now; }
 
-  checkbox.disabled = true;
+  checkbox.disabled = true; // 保存中の連打防止
   try {
     await updateMovie(movieId, (data) => {
       const scene = data.scenes.find((s) => s.id === sceneId);
@@ -218,7 +225,7 @@ export async function toggleSceneShotStatus(sceneId, checkbox, forceMovieId) {
       scene.updatedAt = now;
     });
   } catch (e) {
-
+    // 保存に失敗したら見た目とローカル状態を元に戻す（エラー通知は表示済み）
     checkbox.checked = !checkbox.checked;
     if (localScene) { localScene.status = prevStatus; localScene.updatedAt = prevUpdatedAt; }
   } finally {
@@ -226,6 +233,7 @@ export async function toggleSceneShotStatus(sceneId, checkbox, forceMovieId) {
   }
 }
 
+// ---- 新しいシーンの追加 --------------------------------------------------------
 export async function addScene() {
   const num = document.getElementById('new-scene-number').value.trim();
   const name = document.getElementById('new-scene-name').value.trim();
@@ -250,6 +258,7 @@ export async function addScene() {
     syncItemStatuses(data, newProps, 'props');
   });
 
+  // フォームをリセット
   document.getElementById('new-scene-number').value = '';
   document.getElementById('new-scene-name').value = '';
   document.getElementById('new-scene-location').value = '';
@@ -265,6 +274,7 @@ export async function addScene() {
   showToast(`シーン ${num} を追加しました`);
 }
 
+// ---- 衣装・小道具一覧（インベントリ） -------------------------------------------
 export function getUniqueItemNames(movie, typeKey) {
   const names = new Set();
   movie.scenes.forEach((s) => {
@@ -274,6 +284,7 @@ export function getUniqueItemNames(movie, typeKey) {
   return Array.from(names).sort();
 }
 
+// シーンに割り当てられている登場人物名を重複なく集める（検索フィルタ用）
 export function getUniqueCharacterNames(movie) {
   const names = new Set();
   movie.scenes.forEach((s) => (s.characters || []).forEach((c) => names.add(c)));
@@ -290,6 +301,7 @@ function getEarliestDate(movie, typeKey, itemName) {
   return allDates[0];
 }
 
+// アイテム名ごとの全インスタンスのステータス集合を返す
 function getItemStatuses(movie, typeKey, itemName) {
   const statuses = new Set();
   movie.scenes.forEach((s) => {
@@ -308,6 +320,7 @@ export function renderInventory(movie, listContainer, typeKey) {
     return;
   }
 
+  // ★新機能: 全体の達成率（準備完了のアイテム数 / 全アイテム数）
   const readyCount = uniqueNames.filter((name) => {
     const statuses = getItemStatuses(movie, typeKey, name);
     return statuses.size === 1 && statuses.has('準備完了');
@@ -361,6 +374,7 @@ export function renderInventory(movie, listContainer, typeKey) {
       statusHtml = `<span class="inventory-status-badge status-color status-${st}">${escapeHtml(st)}</span>`;
     }
 
+    // ★新機能: 「最速使用日が早い順」で並べ替え中は最速使用日を表示する
     let earliestHtml = '';
     if (state.currentSort === 'date-asc') {
       const earliest = getEarliestDate(movie, typeKey, name);
@@ -392,6 +406,7 @@ export function renderInventory(movie, listContainer, typeKey) {
     const content = document.createElement('div');
     content.className = 'accordion-content';
 
+    // ★新機能: 一括管理マネージャーは編集者モードのみ表示（.editor-only）
     const editArea = document.createElement('div');
     editArea.className = 'editor-only';
     editArea.style.cssText = 'background:var(--card-bg); padding:12px; margin-bottom:12px; border:1px solid var(--border-color); font-size:13px;';
@@ -417,6 +432,7 @@ export function renderInventory(movie, listContainer, typeKey) {
       <input type="text" class="inv-price" style="margin:0; font-size:12px; padding:6px;" placeholder="金額やメモを入力">
     `;
 
+    // ユーザー由来の値は .value で安全に流し込む（引用符を含む名前でも壊れない）
     const statusSel = editArea.querySelector('.inv-status');
     statusSel.value = st;
     statusSel.addEventListener('change', () => {
