@@ -79,6 +79,11 @@ export function migrateSceneData(scene) {
   scene.costumes.forEach((c) => { if (c.status === '使用済み') c.status = '準備完了'; });
   scene.props.forEach((p) => { if (p.status === '使用済み') p.status = '準備完了'; });
 
+  scene.costumes.forEach((c) => {
+    if (typeof c.character !== 'string') c.character = '';
+    if (!Array.isArray(c.parts)) c.parts = [];
+  });
+
   return scene;
 }
 
@@ -105,6 +110,8 @@ export function syncItemStatuses(movieData, updatedItems, typeKey) {
           item.status = updatedItem.status;
           item.desc = updatedItem.desc;
           item.price = updatedItem.price;
+          if ('character' in updatedItem) item.character = updatedItem.character;
+          if ('parts' in updatedItem) item.parts = updatedItem.parts;
         }
       });
     });

@@ -6,6 +6,7 @@ import { updateMovie } from './firebase.js';
 import { goScene } from './nav.js';
 import { collectDatesFromContainer, collectItemsFromDOM, addDateInput, updateSelectColor, checkSceneInput, collectCharactersFromDOM, renderCharacterCheckboxes } from './items.js';
 import { showToast } from './toast.js';
+import { celebrate } from './celebrate.js';
 
 export function setViewMode(mode) {
   state.currentViewMode = mode;
@@ -138,7 +139,7 @@ export function createSceneCard(scene, forceMovieId = null) {
 
   if (scene.characters && scene.characters.length > 0) {
     html += `<div style="margin-top: 8px;">`;
-    scene.characters.forEach((c) => { html += `<span class="character-badge">🎭 ${escapeHtml(c)}</span>`; });
+    scene.characters.forEach((c) => { html += `<span class="character-badge">${escapeHtml(c)}</span>`; });
     html += `</div>`;
   }
 
@@ -217,6 +218,11 @@ export async function toggleSceneShotStatus(sceneId, checkbox, forceMovieId) {
       scene.status = newStatus;
       scene.updatedAt = now;
     });
+    if (newStatus === '撮影済み') {
+      const allShot = localMovie && localMovie.scenes.length > 0 && localMovie.scenes.every((s) => s.status === '撮影済み');
+      if (allShot) celebrate('🎉 全シーン撮影完了！おつかれさま！', true);
+      else celebrate('📸 ナイス！1シーン撮影済み');
+    }
   } catch (e) {
 
     checkbox.checked = !checkbox.checked;
@@ -422,6 +428,7 @@ export function renderInventory(movie, listContainer, typeKey) {
     statusSel.addEventListener('change', () => {
       updateSelectColor(statusSel);
       updateInventoryItemField(typeKey, name, 'status', statusSel.value);
+      if (statusSel.value === '準備完了') celebrate('✨ 準備完了！');
     });
 
     const descArea = editArea.querySelector('.inv-desc');
@@ -435,6 +442,18 @@ export function renderInventory(movie, listContainer, typeKey) {
     editArea.querySelector('.inv-rename').addEventListener('click', () => renameInventoryItemBulk(typeKey, name));
 
     content.appendChild(editArea);
+
+    if (typeKey === 'costumes' && (sampleItem.character || (sampleItem.parts && sampleItem.parts.length))) {
+      const info = document.createElement('div');
+      info.style.cssText = 'margin-bottom:12px; font-size:13px;';
+      let ih = '';
+      if (sampleItem.character) ih += `<div style="margin-bottom:4px;">誰の衣装: <span class="character-badge">${escapeHtml(sampleItem.character)}</span></div>`;
+      if (sampleItem.parts && sampleItem.parts.length) {
+        ih += `<div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;"><span style="color:var(--muted-text); font-size:12px;">構成:</span>${sampleItem.parts.map((p) => `<span class="part-chip">${escapeHtml(p)}</span>`).join('')}</div>`;
+      }
+      info.innerHTML = ih;
+      content.appendChild(info);
+    }
 
     matchingScenes
       .sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, { numeric: true, sensitivity: 'base' }))

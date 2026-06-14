@@ -153,7 +153,7 @@ export function buildTimeline(scenes, settings) {
 }
 
 let excelJsPromise = null;
-function loadExcelJS() {
+export function loadExcelJS() {
   if (window.ExcelJS) return Promise.resolve();
   if (!excelJsPromise) {
     excelJsPromise = new Promise((resolve, reject) => {

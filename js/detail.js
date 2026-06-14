@@ -63,7 +63,7 @@ function renderCharacterView(elementId, scene) {
   characters.forEach((name) => {
     const actor = actorOf[name];
     const label = actor ? `${name}（${actor}）` : name;
-    html += `<span class="character-badge">🎭 ${escapeHtml(label)}</span>`;
+    html += `<span class="character-badge">${escapeHtml(label)}</span>`;
   });
   container.innerHTML = html;
 }
@@ -80,7 +80,9 @@ function renderItemList(elementId, label, items) {
       <div style="display:flex; align-items:flex-start; width:100%;">
         <span class="status-color status-${st}" style="padding:2px 4px; font-size:11px; flex-shrink:0; margin-right:6px; margin-top:2px;">${escapeHtml(st)}</span>
         <strong style="word-break:break-all; line-height:1.4;">${escapeHtml(item.name)}</strong>
+        ${item.character ? `<span class="character-badge" style="margin-left:6px; flex-shrink:0;">${escapeHtml(item.character)}</span>` : ''}
       </div>
+      ${(item.parts && item.parts.length) ? `<div style="margin-top:6px; width:100%; display:flex; flex-wrap:wrap; gap:4px;">${item.parts.map((p) => `<span class="part-chip">${escapeHtml(p)}</span>`).join('')}</div>` : ''}
       ${item.desc ? `<div class="scene-info" style="margin-top: 4px; width:100%; word-break:break-all;">${escapeHtml(item.desc)}</div>` : ''}
       ${item.price ? `<div class="scene-info" style="color:var(--muted-text); width:100%; word-break:break-all;">${escapeHtml(item.price)}</div>` : ''}
     </div>`;

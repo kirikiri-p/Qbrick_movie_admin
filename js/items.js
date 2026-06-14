@@ -49,10 +49,12 @@ export function collectDatesFromContainer(containerId) {
 function createItemInputBlock(type, item = null) {
   const id = item ? item.id : Date.now() + Math.random().toString(36).substring(2, 7);
   const status = safeStatus(item ? item.status : '未着手');
-  const labelName = type === 'costume' ? '衣装名' : '小道具名';
-  const labelDesc = type === 'costume' ? '衣装詳細' : '小道具詳細';
-  const placeholderName = type === 'costume' ? '例: スーツ' : '例: スマホ';
-  const placeholderDesc = type === 'costume' ? '例: ○○さんの私物' : '例: なるべく小さいもの';
+  const isCostume = type === 'costume';
+  const labelName = isCostume ? '衣装セット名' : '小道具名';
+  const labelDesc = isCostume ? '衣装詳細' : '小道具詳細';
+  const placeholderName = isCostume ? '例: 夏制服' : '例: スマホ';
+  const placeholderDesc = isCostume ? '例: ○○さんの私物' : '例: なるべく小さいもの';
+  const labelMuted = 'margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;';
 
   const div = document.createElement('div');
   div.className = 'item-input-block';
@@ -66,14 +68,23 @@ function createItemInputBlock(type, item = null) {
       <option value="準備完了">準備完了</option>
     </select>
 
-    <div style="margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;">${labelName}</div>
+    <div style="${labelMuted}">${labelName}</div>
     <input type="text" class="item-name" placeholder="${placeholderName}">
     <div class="suggestion-container"></div>
 
-    <div style="margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;">${labelDesc}</div>
+    ${isCostume ? `
+    <div style="${labelMuted}">誰の衣装</div>
+    <select class="item-character"></select>
+
+    <div style="${labelMuted}">構成パーツ（シャツ・ブレザー など）</div>
+    <div class="cos-parts"></div>
+    <button type="button" class="cos-add-part" style="width:auto; margin:4px 0 0 0; padding:4px 10px; font-size:12px; background:transparent; color:var(--text-color); border:1px dashed var(--border-color);">＋ パーツを追加</button>
+    ` : ''}
+
+    <div style="${labelMuted}">${labelDesc}</div>
     <textarea class="item-desc" placeholder="${placeholderDesc}"></textarea>
 
-    <div style="margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;">金額/メモ</div>
+    <div style="${labelMuted}">金額/メモ</div>
     <input type="text" class="item-price" placeholder="例: 1500円">
   `;
 
@@ -88,6 +99,47 @@ function createItemInputBlock(type, item = null) {
 
   div.querySelector('.item-desc').value = item ? (item.desc || '') : '';
   div.querySelector('.item-price').value = item ? (item.price || '') : '';
+
+  if (isCostume) {
+    const charSel = div.querySelector('.item-character');
+    charSel.add(new Option('未設定', ''));
+    const movie = state.movies.find((m) => m.id === state.currentMovieId);
+    const cast = (movie && Array.isArray(movie.cast)) ? movie.cast : [];
+    const seen = new Set();
+    cast.forEach((c) => {
+      if (c.character && !seen.has(c.character)) {
+        seen.add(c.character);
+        charSel.add(new Option(c.actor ? `${c.character}（${c.actor}）` : c.character, c.character));
+      }
+    });
+    const curChar = item ? (item.character || '') : '';
+    if (curChar && !seen.has(curChar)) charSel.add(new Option(curChar, curChar));
+    charSel.value = curChar;
+
+    const partsContainer = div.querySelector('.cos-parts');
+    const addPart = (val = '') => {
+      const row = document.createElement('div');
+      row.className = 'cos-part-row';
+      row.style.cssText = 'display:flex; gap:6px; margin-bottom:6px; align-items:center;';
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'cos-part';
+      inp.placeholder = '例: シャツ';
+      inp.value = val;
+      inp.style.margin = '0';
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'item-remove-btn';
+      rm.style.cssText = 'position:static; padding:6px 10px;';
+      rm.title = 'このパーツを消す';
+      rm.textContent = '✕';
+      rm.addEventListener('click', () => row.remove());
+      row.append(inp, rm);
+      partsContainer.appendChild(row);
+    };
+    (item && Array.isArray(item.parts) ? item.parts : []).forEach((p) => addPart(typeof p === 'string' ? p : (p && p.name) || ''));
+    div.querySelector('.cos-add-part').addEventListener('click', () => addPart(''));
+  }
 
   div.querySelector('.item-remove-btn').addEventListener('click', () => div.remove());
 
@@ -153,13 +205,19 @@ export function collectItemsFromDOM(containerId) {
   document.querySelectorAll(`#${containerId} .item-input-block`).forEach((block) => {
     const name = block.querySelector('.item-name').value.trim();
     if (name) {
-      items.push({
+      const obj = {
         id: block.dataset.id,
         status: safeStatus(block.querySelector('.item-status').value),
         name: name,
         desc: block.querySelector('.item-desc').value,
         price: block.querySelector('.item-price').value
-      });
+      };
+      const charSel = block.querySelector('.item-character');
+      if (charSel) {
+        obj.character = charSel.value;
+        obj.parts = [...block.querySelectorAll('.cos-part')].map((i) => i.value.trim()).filter(Boolean);
+      }
+      items.push(obj);
     }
   });
   return items;

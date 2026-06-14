@@ -2,13 +2,14 @@ import { state } from './state.js';
 import { parseExcelDate, getNowFormattedString, safeStatus } from './utils.js';
 import { createMovie } from './firebase.js';
 import { showToast } from './toast.js';
+import { loadExcelJS } from './callsheet.js';
 
 const DELIMITER = '|';
 
 function splitCell(value) {
   if (value === undefined || value === null || value === '') return [];
   const s = String(value);
-  const delim = s.includes(DELIMITER) ? DELIMITER : ',';
+  const delim = s.includes('\n') ? '\n' : (s.includes(DELIMITER) ? DELIMITER : ',');
   return s.split(delim);
 }
 
@@ -48,12 +49,16 @@ export function handleExcelUpload(event) {
         const cNames = splitCell(row[5]);
         const cDescs = splitCell(row[6]);
         const cPrices = splitCell(row[7]);
+        const cChars = splitCell(row[16]);
+        const cParts = splitCell(row[17]);
         const costumes = cNames.map((n, i) => ({
           id: 'c' + Date.now() + i + Math.random(),
           name: n.trim(),
           status: safeStatus((cStats[i] || '未着手').trim()),
           desc: (cDescs[i] || '').trim(),
-          price: (cPrices[i] || '').trim()
+          price: (cPrices[i] || '').trim(),
+          character: (cChars[i] || '').trim(),
+          parts: (cParts[i] || '').split('・').map((x) => x.trim()).filter(Boolean)
         })).filter((c) => c.name);
 
         const pStats = splitCell(row[8]);
@@ -110,37 +115,101 @@ export function handleExcelUpload(event) {
   reader.readAsArrayBuffer(file);
 }
 
-export function exportToExcel() {
+function thinBorder() {
+  const s = { style: 'thin', color: { argb: 'FFCCCCCC' } };
+  return { top: s, bottom: s, left: s, right: s };
+}
+
+const STATUS_FILL = {
+  '未着手': 'FFFDE7E7',
+  '準備中': 'FFFFF3E0',
+  '準備完了': 'FFE8F5E9'
+};
+
+export async function exportToExcel() {
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   if (!movie) return;
 
-  const aoa = [[
-    'シーン番号', '撮影日', 'シーン名', '場所',
-    '衣装ステータス', '衣装名', '衣装詳細', '金額/メモ',
-    '小道具ステータス', '物品名', '小道具詳細', '金額/メモ',
-    '撮影ステータス', '時間帯', 'メモ', '登場人物'
-  ]];
+  try {
+    await loadExcelJS();
+    const wb = new window.ExcelJS.Workbook();
+    const ws = wb.addWorksheet('シーン一覧', { views: [{ state: 'frozen', ySplit: 1 }] });
 
-  const actorOf = {};
-  (movie.cast || []).forEach((c) => { if (c.character) actorOf[c.character] = c.actor || ''; });
+    const cols = [
+      { header: 'シーン番号', width: 10 },
+      { header: '撮影日', width: 13 },
+      { header: 'シーン名', width: 18 },
+      { header: '場所', width: 18 },
+      { header: '衣装ステータス', width: 11 },
+      { header: '衣装名', width: 16 },
+      { header: '衣装詳細', width: 22 },
+      { header: '衣装 金額/メモ', width: 12 },
+      { header: '小道具ステータス', width: 11 },
+      { header: '物品名', width: 16 },
+      { header: '小道具詳細', width: 22 },
+      { header: '小道具 金額/メモ', width: 12 },
+      { header: '撮影', width: 9 },
+      { header: '時間帯', width: 7 },
+      { header: 'メモ', width: 26 },
+      { header: '登場人物', width: 18 },
+      { header: '誰の衣装', width: 14 },
+      { header: '衣装パーツ', width: 20 }
+    ];
+    ws.columns = cols.map((c) => ({ width: c.width }));
 
-  movie.scenes.forEach((s) => {
-    const dateStr = s.dates ? s.dates.join(',') : '';
-    const join = (items, key) => (items || []).map((i) => i[key] ?? '').join(DELIMITER);
-    const charStr = (s.characters || [])
-      .map((n) => (actorOf[n] ? `${n}（${actorOf[n]}）` : n))
-      .join(DELIMITER);
+    const headerRow = ws.addRow(cols.map((c) => c.header));
+    headerRow.height = 24;
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A1A1A' } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      cell.border = thinBorder();
+    });
 
-    aoa.push([
-      s.number, dateStr, s.sceneName, s.location,
-      join(s.costumes, 'status'), join(s.costumes, 'name'), join(s.costumes, 'desc'), join(s.costumes, 'price'),
-      join(s.props, 'status'), join(s.props, 'name'), join(s.props, 'desc'), join(s.props, 'price'),
-      s.status || '未撮影', s.timeZone || '', s.memo || '', charStr
-    ]);
-  });
+    const actorOf = {};
+    (movie.cast || []).forEach((c) => { if (c.character) actorOf[c.character] = c.actor || ''; });
+    const flat = (v) => String(v ?? '').replace(/\r?\n/g, ' ');
+    const col = (items, key) => (items || []).map((i) => flat(i[key])).join('\n');
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Scenes');
-  XLSX.writeFile(wb, `${movie.title}_シーン一覧.xlsx`);
+    movie.scenes
+      .slice()
+      .sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, { numeric: true, sensitivity: 'base' }))
+      .forEach((s) => {
+        const charStr = (s.characters || []).map((n) => (actorOf[n] ? `${n}（${actorOf[n]}）` : n)).join('\n');
+        const cosChar = (s.costumes || []).map((c) => flat(c.character || '')).join('\n');
+        const cosParts = (s.costumes || []).map((c) => (c.parts || []).join('・')).join('\n');
+
+        const row = ws.addRow([
+          s.number, (s.dates || []).join(','), s.sceneName || '', s.location || '',
+          col(s.costumes, 'status'), col(s.costumes, 'name'), col(s.costumes, 'desc'), col(s.costumes, 'price'),
+          col(s.props, 'status'), col(s.props, 'name'), col(s.props, 'desc'), col(s.props, 'price'),
+          s.status || '未撮影', s.timeZone || '', s.memo || '', charStr, cosChar, cosParts
+        ]);
+        row.alignment = { vertical: 'top', wrapText: true };
+        row.eachCell((cell) => { cell.border = thinBorder(); });
+
+        const shotCell = row.getCell(13);
+        if (s.status === '撮影済み') {
+          shotCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3F2FD' } };
+          shotCell.font = { color: { argb: 'FF1976D2' }, bold: true };
+        }
+        const fill = STATUS_FILL[safeStatus((s.costumes && s.costumes[0] && s.costumes[0].status) || '未着手')];
+        if (fill) row.getCell(5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
+      });
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${movie.title}_シーン一覧.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    showToast('Excelを書き出しました');
+  } catch (e) {
+    console.error(e);
+    alert('Excelの書き出しに失敗しました。通信環境を確認してください。');
+  }
 }
