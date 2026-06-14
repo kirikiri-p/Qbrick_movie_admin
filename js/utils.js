@@ -42,7 +42,9 @@ export function parseExcelDate(serial) {
 
 export function migrateMovieData(data) {
   if (!Array.isArray(data.directors)) {
-    data.directors = data.director ? [String(data.director)] : [];
+    data.directors = data.director
+      ? String(data.director).split(/[、,，・/／]/).map((s) => s.trim()).filter(Boolean)
+      : [];
   }
   if (!Array.isArray(data.cast)) data.cast = [];
   return data;

@@ -37,6 +37,8 @@ body.editor-mode .viewer-only { display: none !important; }
 
 .container { padding: 20px; max-width: 1200px; margin: 0 auto;}
 
+.app-version { text-align: right; font-size: 11px; color: var(--muted-text); margin-top: 24px; opacity: 0.7; }
+
 .card { background: var(--card-bg); padding: 20px; border-radius: 2px; margin-bottom: 16px; border: 1px solid var(--border-color); box-shadow: 2px 2px 0px rgba(0,0,0,0.05); transition: 0.1s;}
 .card-no-click { cursor: default; }
 
