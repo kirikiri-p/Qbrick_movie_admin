@@ -221,7 +221,6 @@ export async function toggleSceneShotStatus(sceneId, checkbox, forceMovieId) {
     if (newStatus === '撮影済み') {
       const allShot = localMovie && localMovie.scenes.length > 0 && localMovie.scenes.every((s) => s.status === '撮影済み');
       if (allShot) celebrate('🎉 全シーン撮影完了！おつかれさま！', true);
-      else celebrate('📸 ナイス！1シーン撮影済み');
     }
   } catch (e) {
 
@@ -428,7 +427,6 @@ export function renderInventory(movie, listContainer, typeKey) {
     statusSel.addEventListener('change', () => {
       updateSelectColor(statusSel);
       updateInventoryItemField(typeKey, name, 'status', statusSel.value);
-      if (statusSel.value === '準備完了') celebrate('✨ 準備完了！');
     });
 
     const descArea = editArea.querySelector('.inv-desc');
@@ -440,6 +438,66 @@ export function renderInventory(movie, listContainer, typeKey) {
     priceInput.addEventListener('change', () => updateInventoryItemField(typeKey, name, 'price', priceInput.value));
 
     editArea.querySelector('.inv-rename').addEventListener('click', () => renameInventoryItemBulk(typeKey, name));
+
+    if (typeKey === 'costumes') {
+      const charLabel = document.createElement('div');
+      charLabel.style.cssText = 'margin:8px 0 4px;';
+      charLabel.textContent = '誰の衣装:';
+      const charSel = document.createElement('select');
+      charSel.className = 'inv-character';
+      charSel.style.cssText = 'width:auto; margin:0; padding:4px 8px; font-size:12px;';
+      charSel.add(new Option('未設定', ''));
+      const invMovie = state.movies.find((m) => m.id === state.currentMovieId);
+      const cast = (invMovie && invMovie.cast) || [];
+      const seenChar = new Set();
+      cast.forEach((c) => {
+        if (c.character && !seenChar.has(c.character)) {
+          seenChar.add(c.character);
+          charSel.add(new Option(c.actor ? `${c.character}（${c.actor}）` : c.character, c.character));
+        }
+      });
+      const curChar = sampleItem.character || '';
+      if (curChar && !seenChar.has(curChar)) charSel.add(new Option(curChar, curChar));
+      charSel.value = curChar;
+      charSel.addEventListener('change', () => updateInventoryItemField(typeKey, name, 'character', charSel.value));
+
+      const partsLabel = document.createElement('div');
+      partsLabel.style.cssText = 'margin:8px 0 4px;';
+      partsLabel.textContent = '構成パーツ:';
+      const partsWrap = document.createElement('div');
+      partsWrap.className = 'inv-parts';
+      const commitParts = () => {
+        const arr = [...partsWrap.querySelectorAll('.inv-part')].map((i) => i.value.trim()).filter(Boolean);
+        updateInventoryItemField(typeKey, name, 'parts', arr);
+      };
+      const addPartRow = (val = '') => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; gap:6px; margin-bottom:6px; align-items:center;';
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'inv-part';
+        inp.placeholder = '例: シャツ';
+        inp.value = val;
+        inp.style.cssText = 'margin:0; font-size:12px; padding:6px;';
+        inp.addEventListener('change', commitParts);
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'item-remove-btn';
+        rm.style.cssText = 'position:static; padding:6px 10px;';
+        rm.textContent = '✕';
+        rm.addEventListener('click', () => { row.remove(); commitParts(); });
+        row.append(inp, rm);
+        partsWrap.appendChild(row);
+      };
+      (sampleItem.parts || []).forEach((p) => addPartRow(typeof p === 'string' ? p : (p && p.name) || ''));
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.textContent = '＋ パーツを追加';
+      addBtn.style.cssText = 'width:auto; margin:4px 0 0; padding:4px 10px; font-size:12px; background:transparent; color:var(--text-color); border:1px dashed var(--border-color);';
+      addBtn.addEventListener('click', () => addPartRow(''));
+
+      editArea.append(charLabel, charSel, partsLabel, partsWrap, addBtn);
+    }
 
     content.appendChild(editArea);
 

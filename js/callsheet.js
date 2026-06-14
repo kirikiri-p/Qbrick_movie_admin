@@ -126,11 +126,15 @@ export function buildTimeline(scenes, settings) {
     if (loc !== currentLoc) {
       const from = currentLoc || '集合場所';
       const to = loc || '次のロケ地';
-      rows.push({ time: fmtRange(t, t + settings.moveMin), name: `移動（${from}→${to}）・撮影準備` });
+      rows.push({ time: fmtRange(t, t + settings.moveMin), name: `移動（${from}→${to}）` });
       t += settings.moveMin;
       currentLoc = loc;
       insertLunchIfNeeded();
     }
+
+    rows.push({ time: fmtRange(t, t + settings.prepMin), name: `撮影準備（シーン ${scene.number}）` });
+    t += settings.prepMin;
+    insertLunchIfNeeded();
 
     if (shootStart === null) shootStart = t;
     rows.push({
@@ -216,6 +220,7 @@ export async function generateCallsheet() {
     meetTime: document.getElementById('cs-meet-time').value || '08:30',
     sceneMin: Math.max(5, parseInt(document.getElementById('cs-scene-min').value) || 60),
     moveMin: Math.max(0, parseInt(document.getElementById('cs-move-min').value) || 30),
+    prepMin: Math.max(0, parseInt(document.getElementById('cs-prep-min').value) || 30),
     lunchEnabled: document.getElementById('cs-lunch-enabled').checked,
     lunchStart: document.getElementById('cs-lunch-start').value || '12:00',
     lunchMin: Math.max(0, parseInt(document.getElementById('cs-lunch-min').value) || 60),
