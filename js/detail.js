@@ -82,7 +82,7 @@ function renderItemList(elementId, label, items) {
         <strong style="word-break:break-all; line-height:1.4;">${escapeHtml(item.name)}</strong>
         ${item.character ? `<span class="character-badge" style="margin-left:6px; flex-shrink:0;">${escapeHtml(item.character)}</span>` : ''}
       </div>
-      ${(item.parts && item.parts.length) ? `<div style="margin-top:6px; width:100%; display:flex; flex-wrap:wrap; gap:4px;">${item.parts.map((p) => `<span class="part-chip">${escapeHtml(p)}</span>`).join('')}</div>` : ''}
+      ${(item.parts && item.parts.length) ? `<div style="margin-top:6px; width:100%; display:flex; flex-wrap:wrap; gap:4px;">${item.parts.map((p) => `<span class="part-chip" title="${escapeHtml(p.desc || '')}"><span class="status-color status-${safeStatus(p.status)} part-stat">${escapeHtml(safeStatus(p.status))}</span>${escapeHtml(p.name)}</span>`).join('')}</div>` : ''}
       ${item.desc ? `<div class="scene-info" style="margin-top: 4px; width:100%; word-break:break-all;">${escapeHtml(item.desc)}</div>` : ''}
       ${item.price ? `<div class="scene-info" style="color:var(--muted-text); width:100%; word-break:break-all;">${escapeHtml(item.price)}</div>` : ''}
     </div>`;

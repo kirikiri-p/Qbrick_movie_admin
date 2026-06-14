@@ -79,10 +79,17 @@ export function migrateSceneData(scene) {
   scene.costumes.forEach((c) => { if (c.status === '使用済み') c.status = '準備完了'; });
   scene.props.forEach((p) => { if (p.status === '使用済み') p.status = '準備完了'; });
 
-  scene.costumes.forEach((c) => {
-    if (typeof c.character !== 'string') c.character = '';
-    if (!Array.isArray(c.parts)) c.parts = [];
-  });
+  const normItem = (it) => {
+    if (typeof it.character !== 'string') it.character = '';
+    if (!Array.isArray(it.parts)) it.parts = [];
+    it.parts = it.parts
+      .map((p) => (typeof p === 'string'
+        ? { name: p, desc: '', status: '未着手' }
+        : { name: p.name || '', desc: p.desc || '', status: safeStatus(p.status || '未着手') }))
+      .filter((p) => p.name);
+  };
+  scene.costumes.forEach(normItem);
+  scene.props.forEach(normItem);
 
   return scene;
 }
@@ -106,11 +113,10 @@ export function syncItemStatuses(movieData, updatedItems, typeKey) {
     (movieData.scenes || []).forEach((scene) => {
       const items = scene[typeKey] || [];
       items.forEach((item) => {
-        if (item.name === updatedItem.name) {
+        if (item.name === updatedItem.name && (item.character || '') === (updatedItem.character || '')) {
           item.status = updatedItem.status;
           item.desc = updatedItem.desc;
           item.price = updatedItem.price;
-          if ('character' in updatedItem) item.character = updatedItem.character;
           if ('parts' in updatedItem) item.parts = updatedItem.parts;
         }
       });

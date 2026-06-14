@@ -285,39 +285,64 @@ export function getUniqueCharacterNames(movie) {
   return Array.from(names).sort();
 }
 
-function getEarliestDate(movie, typeKey, itemName) {
+const GSEP = '␟';
+const matchGroup = (character, name) => (i) => i.name === name && (i.character || '') === character;
+
+function getEarliestDate(movie, typeKey, character, name) {
   const scenes = movie.scenes.filter((s) => {
     const items = (typeKey === 'costumes' ? s.costumes : s.props) || [];
-    return items.some((i) => i.name === itemName) && s.dates && s.dates.length > 0;
+    return items.some(matchGroup(character, name)) && s.dates && s.dates.length > 0;
   });
   if (scenes.length === 0) return null;
   const allDates = scenes.flatMap((s) => s.dates).sort();
   return allDates[0];
 }
 
-function getItemStatuses(movie, typeKey, itemName) {
+function getItemStatuses(movie, typeKey, character, name) {
   const statuses = new Set();
   movie.scenes.forEach((s) => {
     const items = (typeKey === 'costumes' ? s.costumes : s.props) || [];
-    items.filter((i) => i.name === itemName).forEach((i) => statuses.add(i.status));
+    items.filter(matchGroup(character, name)).forEach((i) => statuses.add(i.status));
   });
   return statuses;
 }
 
-export function renderInventory(movie, listContainer, typeKey) {
-  const uniqueNames = getUniqueItemNames(movie, typeKey);
-  const typeLabel = typeKey === 'costumes' ? '衣装' : '小道具';
+function getUniqueGroups(movie, typeKey) {
+  const map = new Map();
+  movie.scenes.forEach((s) => {
+    ((typeKey === 'costumes' ? s.costumes : s.props) || []).forEach((it) => {
+      const character = it.character || '';
+      const key = character + GSEP + it.name;
+      if (!map.has(key)) map.set(key, { character, name: it.name });
+    });
+  });
+  return Array.from(map.values());
+}
 
-  if (uniqueNames.length === 0) {
+function partsHtml(parts) {
+  if (!parts || !parts.length) return '';
+  const chips = parts.map((p) => {
+    const st = safeStatus(p.status);
+    return `<span class="part-chip" title="${escapeHtml(p.desc || '')}"><span class="status-color status-${st} part-stat">${escapeHtml(st)}</span>${escapeHtml(p.name)}</span>`;
+  }).join('');
+  return `<div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-top:4px;"><span style="color:var(--muted-text); font-size:12px;">構成:</span>${chips}</div>`;
+}
+
+export function renderInventory(movie, listContainer, typeKey) {
+  const groups = getUniqueGroups(movie, typeKey);
+  const typeLabel = typeKey === 'costumes' ? '衣装' : '小道具';
+  const whoLabel = typeKey === 'costumes' ? '誰の衣装' : '誰の小道具';
+
+  if (groups.length === 0) {
     listContainer.innerHTML = `<p class="scene-info">まだ登録されていません。</p>`;
     return;
   }
 
-  const readyCount = uniqueNames.filter((name) => {
-    const statuses = getItemStatuses(movie, typeKey, name);
+  const readyCount = groups.filter((g) => {
+    const statuses = getItemStatuses(movie, typeKey, g.character, g.name);
     return statuses.size === 1 && statuses.has('準備完了');
   }).length;
-  const ratePct = Math.round((readyCount / uniqueNames.length) * 100);
+  const ratePct = Math.round((readyCount / groups.length) * 100);
 
   const rateCard = document.createElement('div');
   rateCard.className = 'card card-no-click';
@@ -326,69 +351,67 @@ export function renderInventory(movie, listContainer, typeKey) {
       <span>${typeLabel}の準備達成率</span>
       <span style="font-size: 20px;">${ratePct}%</span>
     </div>
-    <div class="scene-info" style="margin-top: 2px;">準備完了: ${readyCount} / ${uniqueNames.length}個</div>
+    <div class="scene-info" style="margin-top: 2px;">準備完了: ${readyCount} / ${groups.length}個</div>
     <div class="progress-track">
       <div class="progress-fill" style="width: ${ratePct}%;"></div>
     </div>
   `;
   listContainer.appendChild(rateCard);
 
-  uniqueNames.sort((a, b) => {
-    if (state.currentSort === 'name-asc') return a.localeCompare(b);
+  groups.sort((a, b) => {
+    if (state.currentSort === 'name-asc') return (a.name + a.character).localeCompare(b.name + b.character);
     if (state.currentSort === 'date-asc') {
-      const dateA = getEarliestDate(movie, typeKey, a);
-      const dateB = getEarliestDate(movie, typeKey, b);
+      const dateA = getEarliestDate(movie, typeKey, a.character, a.name);
+      const dateB = getEarliestDate(movie, typeKey, b.character, b.name);
       if (!dateA && !dateB) return 0;
       if (!dateA) return 1;
       if (!dateB) return -1;
       return dateA.localeCompare(dateB);
     }
     if (state.currentSort === 'count-desc') {
-      const countA = movie.scenes.filter((s) => ((typeKey === 'costumes' ? s.costumes : s.props) || []).some((i) => i.name === a)).length;
-      const countB = movie.scenes.filter((s) => ((typeKey === 'costumes' ? s.costumes : s.props) || []).some((i) => i.name === b)).length;
-      return countB - countA;
+      const cnt = (g) => movie.scenes.filter((s) => ((typeKey === 'costumes' ? s.costumes : s.props) || []).some(matchGroup(g.character, g.name))).length;
+      return cnt(b) - cnt(a);
     }
     return 0;
   });
 
-  uniqueNames.forEach((name) => {
-    const matchingScenes = movie.scenes.filter((s) => {
-      const items = (typeKey === 'costumes' ? s.costumes : s.props) || [];
-      return items.some((i) => i.name === name);
-    });
+  groups.forEach((group) => {
+    const character = group.character;
+    const name = group.name;
+    const gkey = character + GSEP + name;
+    const match = matchGroup(character, name);
 
-    const sampleItem = matchingScenes[0][typeKey].find((i) => i.name === name) || {};
+    const matchingScenes = movie.scenes.filter((s) => ((typeKey === 'costumes' ? s.costumes : s.props) || []).some(match));
+    const sampleItem = matchingScenes[0][typeKey].find(match) || {};
 
-    const itemStatuses = getItemStatuses(movie, typeKey, name);
+    const itemStatuses = getItemStatuses(movie, typeKey, character, name);
     let statusHtml = '';
     if (itemStatuses.size === 1) {
-      const st = safeStatus(Array.from(itemStatuses)[0]);
-      statusHtml = `<span class="inventory-status-badge status-color status-${st}">${escapeHtml(st)}</span>`;
+      const stx = safeStatus(Array.from(itemStatuses)[0]);
+      statusHtml = `<span class="inventory-status-badge status-color status-${stx}">${escapeHtml(stx)}</span>`;
     }
 
     let earliestHtml = '';
     if (state.currentSort === 'date-asc') {
-      const earliest = getEarliestDate(movie, typeKey, name);
+      const earliest = getEarliestDate(movie, typeKey, character, name);
       earliestHtml = `<div class="earliest-date-label">最速使用日: ${escapeHtml(earliest || '未定')}</div>`;
     }
 
+    const charBadge = character ? `<span class="character-badge" style="margin-left:6px;">${escapeHtml(character)}</span>` : '';
+
     const details = document.createElement('details');
     details.className = 'accordion inventory-accordion';
-
-    if (state.openedAccordionNames.has(name)) {
-      details.setAttribute('open', 'true');
-    }
-
+    if (state.openedAccordionNames.has(gkey)) details.setAttribute('open', 'true');
     details.addEventListener('toggle', () => {
-      if (details.hasAttribute('open')) state.openedAccordionNames.add(name);
-      else state.openedAccordionNames.delete(name);
+      if (details.hasAttribute('open')) state.openedAccordionNames.add(gkey);
+      else state.openedAccordionNames.delete(gkey);
     });
 
     const summary = document.createElement('summary');
     summary.innerHTML = `
       <div style="display:flex; align-items:flex-start; width:100%;">
         <div style="flex-shrink:0; margin-top:2px;">${statusHtml}</div>
-        <div style="flex:1; word-break:break-all; line-height:1.4;">${escapeHtml(name)}${earliestHtml}</div>
+        <div style="flex:1; word-break:break-all; line-height:1.4;">${escapeHtml(name)}${charBadge}${earliestHtml}</div>
         <div style="flex-shrink:0; white-space:nowrap; margin-left:8px; font-weight:normal; font-size:12px; color:var(--muted-text);">(${matchingScenes.length}件)</div>
       </div>
     `;
@@ -416,6 +439,11 @@ export function renderInventory(movie, listContainer, typeKey) {
         </select>
         <button class="secondary inv-rename" style="width:auto; margin:0; padding:4px 8px; font-size:12px; background:var(--text-color); color:var(--bg-color);">✏️ 名称を一斉変更</button>
       </div>
+      <div style="margin-bottom:4px;">${whoLabel}:</div>
+      <select class="inv-character" style="width:auto; margin:0 0 8px; padding:4px 8px; font-size:12px;"></select>
+      <div style="margin-bottom:4px;">構成パーツ（名称・詳細・準備状況）:</div>
+      <div class="inv-parts"></div>
+      <button type="button" class="inv-add-part" style="width:auto; margin:4px 0 8px; padding:4px 10px; font-size:12px; background:transparent; color:var(--text-color); border:1px dashed var(--border-color);">＋ パーツを追加</button>
       <div style="margin-bottom:4px;">詳細情報・メモ:</div>
       <textarea class="inv-desc" style="margin:0 0 8px 0; font-size:12px; padding:6px;" placeholder="共通の詳細を入力"></textarea>
       <div style="margin-bottom:4px;">金額/メモ:</div>
@@ -426,90 +454,75 @@ export function renderInventory(movie, listContainer, typeKey) {
     statusSel.value = st;
     statusSel.addEventListener('change', () => {
       updateSelectColor(statusSel);
-      updateInventoryItemField(typeKey, name, 'status', statusSel.value);
+      updateInventoryItemField(typeKey, character, name, 'status', statusSel.value);
     });
 
     const descArea = editArea.querySelector('.inv-desc');
     descArea.value = sampleItem.desc || '';
-    descArea.addEventListener('change', () => updateInventoryItemField(typeKey, name, 'desc', descArea.value));
+    descArea.addEventListener('change', () => updateInventoryItemField(typeKey, character, name, 'desc', descArea.value));
 
     const priceInput = editArea.querySelector('.inv-price');
     priceInput.value = sampleItem.price || '';
-    priceInput.addEventListener('change', () => updateInventoryItemField(typeKey, name, 'price', priceInput.value));
+    priceInput.addEventListener('change', () => updateInventoryItemField(typeKey, character, name, 'price', priceInput.value));
 
-    editArea.querySelector('.inv-rename').addEventListener('click', () => renameInventoryItemBulk(typeKey, name));
+    editArea.querySelector('.inv-rename').addEventListener('click', () => renameInventoryItemBulk(typeKey, character, name));
 
-    if (typeKey === 'costumes') {
-      const charLabel = document.createElement('div');
-      charLabel.style.cssText = 'margin:8px 0 4px;';
-      charLabel.textContent = '誰の衣装:';
-      const charSel = document.createElement('select');
-      charSel.className = 'inv-character';
-      charSel.style.cssText = 'width:auto; margin:0; padding:4px 8px; font-size:12px;';
-      charSel.add(new Option('未設定', ''));
-      const invMovie = state.movies.find((m) => m.id === state.currentMovieId);
-      const cast = (invMovie && invMovie.cast) || [];
-      const seenChar = new Set();
-      cast.forEach((c) => {
-        if (c.character && !seenChar.has(c.character)) {
-          seenChar.add(c.character);
-          charSel.add(new Option(c.actor ? `${c.character}（${c.actor}）` : c.character, c.character));
-        }
-      });
-      const curChar = sampleItem.character || '';
-      if (curChar && !seenChar.has(curChar)) charSel.add(new Option(curChar, curChar));
-      charSel.value = curChar;
-      charSel.addEventListener('change', () => updateInventoryItemField(typeKey, name, 'character', charSel.value));
+    const charSel = editArea.querySelector('.inv-character');
+    charSel.add(new Option('未設定', ''));
+    const seenChar = new Set();
+    (movie.cast || []).forEach((c) => {
+      if (c.character && !seenChar.has(c.character)) {
+        seenChar.add(c.character);
+        charSel.add(new Option(c.actor ? `${c.character}（${c.actor}）` : c.character, c.character));
+      }
+    });
+    if (character && !seenChar.has(character)) charSel.add(new Option(character, character));
+    charSel.value = character;
+    charSel.addEventListener('change', () => updateInventoryItemField(typeKey, character, name, 'character', charSel.value));
 
-      const partsLabel = document.createElement('div');
-      partsLabel.style.cssText = 'margin:8px 0 4px;';
-      partsLabel.textContent = '構成パーツ:';
-      const partsWrap = document.createElement('div');
-      partsWrap.className = 'inv-parts';
-      const commitParts = () => {
-        const arr = [...partsWrap.querySelectorAll('.inv-part')].map((i) => i.value.trim()).filter(Boolean);
-        updateInventoryItemField(typeKey, name, 'parts', arr);
-      };
-      const addPartRow = (val = '') => {
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex; gap:6px; margin-bottom:6px; align-items:center;';
-        const inp = document.createElement('input');
-        inp.type = 'text';
-        inp.className = 'inv-part';
-        inp.placeholder = '例: シャツ';
-        inp.value = val;
-        inp.style.cssText = 'margin:0; font-size:12px; padding:6px;';
-        inp.addEventListener('change', commitParts);
-        const rm = document.createElement('button');
-        rm.type = 'button';
-        rm.className = 'item-remove-btn';
-        rm.style.cssText = 'position:static; padding:6px 10px;';
-        rm.textContent = '✕';
-        rm.addEventListener('click', () => { row.remove(); commitParts(); });
-        row.append(inp, rm);
-        partsWrap.appendChild(row);
-      };
-      (sampleItem.parts || []).forEach((p) => addPartRow(typeof p === 'string' ? p : (p && p.name) || ''));
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.textContent = '＋ パーツを追加';
-      addBtn.style.cssText = 'width:auto; margin:4px 0 0; padding:4px 10px; font-size:12px; background:transparent; color:var(--text-color); border:1px dashed var(--border-color);';
-      addBtn.addEventListener('click', () => addPartRow(''));
-
-      editArea.append(charLabel, charSel, partsLabel, partsWrap, addBtn);
-    }
+    const partsWrap = editArea.querySelector('.inv-parts');
+    const commitParts = () => {
+      const arr = [...partsWrap.querySelectorAll('.inv-part-row')].map((row) => ({
+        name: row.querySelector('.inv-part').value.trim(),
+        desc: row.querySelector('.inv-part-desc').value.trim(),
+        status: safeStatus(row.querySelector('.inv-part-status').value)
+      })).filter((p) => p.name);
+      updateInventoryItemField(typeKey, character, name, 'parts', arr);
+    };
+    const addPartRow = (part = {}) => {
+      const row = document.createElement('div');
+      row.className = 'inv-part-row';
+      row.style.cssText = 'display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;';
+      const sel = document.createElement('select');
+      sel.className = 'inv-part-status status-color';
+      sel.style.cssText = 'width:auto; margin:0; padding:4px 6px; font-size:12px;';
+      ['未着手', '準備中', '準備完了'].forEach((o) => sel.add(new Option(o, o)));
+      sel.value = safeStatus(part.status || '未着手');
+      updateSelectColor(sel);
+      sel.addEventListener('change', () => { updateSelectColor(sel); commitParts(); });
+      const nm = document.createElement('input');
+      nm.type = 'text'; nm.className = 'inv-part'; nm.placeholder = 'パーツ名'; nm.value = part.name || '';
+      nm.style.cssText = 'margin:0; font-size:12px; padding:6px; flex:1; min-width:80px;';
+      nm.addEventListener('change', commitParts);
+      const ds = document.createElement('input');
+      ds.type = 'text'; ds.className = 'inv-part-desc'; ds.placeholder = '詳細(任意)'; ds.value = part.desc || '';
+      ds.style.cssText = 'margin:0; font-size:12px; padding:6px; flex:1; min-width:80px;';
+      ds.addEventListener('change', commitParts);
+      const rm = document.createElement('button');
+      rm.type = 'button'; rm.className = 'item-remove-btn'; rm.style.cssText = 'position:static; padding:6px 10px;'; rm.textContent = '✕';
+      rm.addEventListener('click', () => { row.remove(); commitParts(); });
+      row.append(sel, nm, ds, rm);
+      partsWrap.appendChild(row);
+    };
+    (sampleItem.parts || []).forEach((p) => addPartRow(typeof p === 'string' ? { name: p } : (p || {})));
+    editArea.querySelector('.inv-add-part').addEventListener('click', () => addPartRow({}));
 
     content.appendChild(editArea);
 
-    if (typeKey === 'costumes' && (sampleItem.character || (sampleItem.parts && sampleItem.parts.length))) {
+    if (sampleItem.parts && sampleItem.parts.length) {
       const info = document.createElement('div');
       info.style.cssText = 'margin-bottom:12px; font-size:13px;';
-      let ih = '';
-      if (sampleItem.character) ih += `<div style="margin-bottom:4px;">誰の衣装: <span class="character-badge">${escapeHtml(sampleItem.character)}</span></div>`;
-      if (sampleItem.parts && sampleItem.parts.length) {
-        ih += `<div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;"><span style="color:var(--muted-text); font-size:12px;">構成:</span>${sampleItem.parts.map((p) => `<span class="part-chip">${escapeHtml(p)}</span>`).join('')}</div>`;
-      }
-      info.innerHTML = ih;
+      info.innerHTML = partsHtml(sampleItem.parts);
       content.appendChild(info);
     }
 
@@ -522,15 +535,15 @@ export function renderInventory(movie, listContainer, typeKey) {
   });
 }
 
-export async function updateInventoryItemField(typeKey, itemName, fieldKey, newValue) {
+export async function updateInventoryItemField(typeKey, character, itemName, fieldKey, newValue) {
   const now = getNowFormattedString();
   await updateMovie(state.currentMovieId, (data) => {
     data.scenes.forEach((scene) => {
       const items = scene[typeKey] || [];
       let isChanged = false;
       items.forEach((item) => {
-        if (item.name === itemName) {
-          item[fieldKey] = newValue;
+        if (item.name === itemName && (item.character || '') === character) {
+          item[fieldKey] = (fieldKey === 'parts' && Array.isArray(newValue)) ? newValue.map((p) => ({ ...p })) : newValue;
           isChanged = true;
         }
       });
@@ -539,7 +552,7 @@ export async function updateInventoryItemField(typeKey, itemName, fieldKey, newV
   });
 }
 
-export async function renameInventoryItemBulk(typeKey, oldName) {
+export async function renameInventoryItemBulk(typeKey, character, oldName) {
   const newName = prompt(`「${oldName}」の新しい名称を入力してください`, oldName);
   if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
   const trimmed = newName.trim();
@@ -550,7 +563,7 @@ export async function renameInventoryItemBulk(typeKey, oldName) {
       const items = scene[typeKey] || [];
       let isChanged = false;
       items.forEach((item) => {
-        if (item.name === oldName) {
+        if (item.name === oldName && (item.character || '') === character) {
           item.name = trimmed;
           isChanged = true;
         }
@@ -559,9 +572,11 @@ export async function renameInventoryItemBulk(typeKey, oldName) {
     });
   });
 
-  if (state.openedAccordionNames.has(oldName)) {
-    state.openedAccordionNames.delete(oldName);
-    state.openedAccordionNames.add(trimmed);
+  const oldKey = character + GSEP + oldName;
+  const newKey = character + GSEP + trimmed;
+  if (state.openedAccordionNames.has(oldKey)) {
+    state.openedAccordionNames.delete(oldKey);
+    state.openedAccordionNames.add(newKey);
   }
 
   showToast(`「${oldName}」をすべて「${trimmed}」に変更しました`);

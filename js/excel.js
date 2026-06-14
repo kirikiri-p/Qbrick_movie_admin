@@ -20,6 +20,23 @@ function parseCharEntry(entry) {
   return { character: t, actor: '' };
 }
 
+function parsePart(entry) {
+  const t = String(entry).trim();
+  const m = t.match(/^(.*)[（(](未着手|準備中|準備完了)[）)]$/);
+  if (m) return { name: m[1].trim(), desc: '', status: m[2] };
+  return { name: t, desc: '', status: '未着手' };
+}
+function parsePartsCell(cell) {
+  return String(cell || '').split('・').map(parsePart).filter((p) => p.name);
+}
+function encodePart(p) {
+  if (typeof p === 'string') return p;
+  return (p.status && p.status !== '未着手') ? `${p.name}(${p.status})` : p.name;
+}
+function encodeParts(parts) {
+  return (parts || []).map(encodePart).join('・');
+}
+
 export function handleExcelUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -58,19 +75,23 @@ export function handleExcelUpload(event) {
           desc: (cDescs[i] || '').trim(),
           price: (cPrices[i] || '').trim(),
           character: (cChars[i] || '').trim(),
-          parts: (cParts[i] || '').split('・').map((x) => x.trim()).filter(Boolean)
+          parts: parsePartsCell(cParts[i] || '')
         })).filter((c) => c.name);
 
         const pStats = splitCell(row[8]);
         const pNames = splitCell(row[9]);
         const pDescs = splitCell(row[10]);
         const pPrices = splitCell(row[11]);
+        const pChars = splitCell(row[18]);
+        const pParts = splitCell(row[19]);
         const props = pNames.map((n, i) => ({
           id: 'p' + Date.now() + i + Math.random(),
           name: n.trim(),
           status: safeStatus((pStats[i] || '未着手').trim()),
           desc: (pDescs[i] || '').trim(),
-          price: (pPrices[i] || '').trim()
+          price: (pPrices[i] || '').trim(),
+          character: (pChars[i] || '').trim(),
+          parts: parsePartsCell(pParts[i] || '')
         })).filter((p) => p.name);
 
         const status = String(row[12] ?? '').trim() === '撮影済み' ? '撮影済み' : '未撮影';
@@ -153,7 +174,9 @@ export async function exportToExcel() {
       { header: 'メモ', width: 26 },
       { header: '登場人物', width: 18 },
       { header: '誰の衣装', width: 14 },
-      { header: '衣装パーツ', width: 20 }
+      { header: '衣装パーツ', width: 20 },
+      { header: '誰の小道具', width: 14 },
+      { header: '小道具パーツ', width: 20 }
     ];
     ws.columns = cols.map((c) => ({ width: c.width }));
 
@@ -177,13 +200,15 @@ export async function exportToExcel() {
       .forEach((s) => {
         const charStr = (s.characters || []).map((n) => (actorOf[n] ? `${n}（${actorOf[n]}）` : n)).join('\n');
         const cosChar = (s.costumes || []).map((c) => flat(c.character || '')).join('\n');
-        const cosParts = (s.costumes || []).map((c) => (c.parts || []).join('・')).join('\n');
+        const cosParts = (s.costumes || []).map((c) => encodeParts(c.parts)).join('\n');
+        const propChar = (s.props || []).map((p) => flat(p.character || '')).join('\n');
+        const propParts = (s.props || []).map((p) => encodeParts(p.parts)).join('\n');
 
         const row = ws.addRow([
           s.number, (s.dates || []).join(','), s.sceneName || '', s.location || '',
           col(s.costumes, 'status'), col(s.costumes, 'name'), col(s.costumes, 'desc'), col(s.costumes, 'price'),
           col(s.props, 'status'), col(s.props, 'name'), col(s.props, 'desc'), col(s.props, 'price'),
-          s.status || '未撮影', s.timeZone || '', s.memo || '', charStr, cosChar, cosParts
+          s.status || '未撮影', s.timeZone || '', s.memo || '', charStr, cosChar, cosParts, propChar, propParts
         ]);
         row.alignment = { vertical: 'top', wrapText: true };
         row.eachCell((cell) => { cell.border = thinBorder(); });
