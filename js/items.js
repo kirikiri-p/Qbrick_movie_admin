@@ -156,6 +156,14 @@ function createItemInputBlock(type, item = null) {
   (item && Array.isArray(item.parts) ? item.parts : []).forEach((p) => addPart(typeof p === 'string' ? { name: p } : (p || {})));
   div.querySelector('.cos-add-part').addEventListener('click', () => addPart({}));
 
+  div._applySuggestion = (src) => {
+    const c = src.character || '';
+    if (![...charSel.options].some((o) => o.value === c)) charSel.add(new Option(c || '未設定', c));
+    charSel.value = c;
+    partsContainer.innerHTML = '';
+    (Array.isArray(src.parts) ? src.parts : []).forEach((p) => addPart(typeof p === 'string' ? { name: p } : (p || {})));
+  };
+
   div.querySelector('.item-remove-btn').addEventListener('click', () => div.remove());
 
   return div;
@@ -184,8 +192,9 @@ export function showSuggestions(inputElem, type) {
   movie.scenes.forEach((s) => {
     const items = (type === 'costume' ? s.costumes : s.props) || [];
     items.forEach((i) => {
-      if (i.name.includes(name) && (i.desc || i.price || i.status)) {
-        const key = i.name + '|' + i.desc + '|' + i.price + '|' + i.status;
+      if (i.name.includes(name)) {
+        const partsKey = (i.parts || []).map((p) => (typeof p === 'string' ? p : `${p.name}:${p.status}:${p.desc}`)).join('・');
+        const key = [i.name, i.character || '', i.desc || '', i.price || '', i.status || '', partsKey].join('|');
         if (!seen.has(key)) {
           seen.add(key);
           candidates.push(i);
@@ -194,21 +203,26 @@ export function showSuggestions(inputElem, type) {
     });
   });
 
-  candidates.slice(0, 5).forEach((c) => {
+  candidates.slice(0, 6).forEach((c) => {
     const chip = document.createElement('div');
     chip.className = 'suggestion-chip';
-    chip.textContent = `${c.name} ${c.desc ? `(${c.desc.substring(0, 8)}...)` : ''}`;
+    const extras = [];
+    if (c.character) extras.push(c.character);
+    if (c.parts && c.parts.length) extras.push(c.parts.map((p) => (typeof p === 'string' ? p : p.name)).join('・'));
+    if (c.desc) extras.push(c.desc.substring(0, 8));
+    chip.textContent = `${c.name}${extras.length ? `（${extras.join(' / ').substring(0, 30)}）` : ''}`;
     chip.addEventListener('click', () => {
       inputElem.value = c.name;
       const descInput = block.querySelector('.item-desc');
       const priceInput = block.querySelector('.item-price');
       const statusInput = block.querySelector('.item-status');
-      if (descInput) descInput.value = c.desc;
-      if (priceInput) priceInput.value = c.price;
+      if (descInput) descInput.value = c.desc || '';
+      if (priceInput) priceInput.value = c.price || '';
       if (statusInput && c.status) {
         statusInput.value = safeStatus(c.status);
         updateSelectColor(statusInput);
       }
+      if (typeof block._applySuggestion === 'function') block._applySuggestion(c);
       suggestionContainer.innerHTML = '';
     });
     suggestionContainer.appendChild(chip);
