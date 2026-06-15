@@ -8,6 +8,15 @@ export function safeStatus(status) {
   return ITEM_STATUSES.includes(status) ? status : '未着手';
 }
 
+export function parsePrice(value) {
+  if (!value) return 0;
+  const m = String(value).replace(/[,，]/g, '').match(/\d+(\.\d+)?/);
+  return m ? Math.round(parseFloat(m[0])) : 0;
+}
+export function formatYen(n) {
+  return '¥' + (n || 0).toLocaleString('ja-JP');
+}
+
 export function linkify(text) {
   if (!text) return '';
   const escaped = escapeHtml(text);
@@ -81,6 +90,7 @@ export function migrateSceneData(scene) {
 
   const normItem = (it) => {
     if (typeof it.character !== 'string') it.character = '';
+    if (typeof it.imageUrl !== 'string') it.imageUrl = '';
     if (!Array.isArray(it.parts)) it.parts = [];
     it.parts = it.parts
       .map((p) => (typeof p === 'string'
@@ -118,6 +128,7 @@ export function syncItemStatuses(movieData, updatedItems, typeKey) {
           item.desc = updatedItem.desc;
           item.price = updatedItem.price;
           if ('parts' in updatedItem) item.parts = updatedItem.parts;
+          if ('imageUrl' in updatedItem) item.imageUrl = updatedItem.imageUrl;
         }
       });
     });

@@ -11,6 +11,13 @@ import {
 } from './items.js';
 import { showToast } from './toast.js';
 
+let editDirty = false;
+let dirtyListenerReady = false;
+export function isEditDirty() {
+  return editDirty && !document.getElementById('detail-pane-edit').classList.contains('hidden');
+}
+export function clearEditDirty() { editDirty = false; }
+
 export function renderSceneViewDetail() {
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   const scene = movie?.scenes.find((s) => s.id === state.currentSceneId);
@@ -82,6 +89,7 @@ function renderItemList(elementId, label, items) {
         <strong style="word-break:break-all; line-height:1.4;">${escapeHtml(item.name)}</strong>
         ${item.character ? `<span class="character-badge" style="margin-left:6px; flex-shrink:0;">${escapeHtml(item.character)}</span>` : ''}
       </div>
+      ${item.imageUrl ? `<a href="${escapeHtml(item.imageUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHtml(item.imageUrl)}" alt="参考写真" class="ref-thumb"></a>` : ''}
       ${(item.parts && item.parts.length) ? `<div style="margin-top:6px; width:100%; display:flex; flex-wrap:wrap; gap:4px;">${item.parts.map((p) => `<span class="part-chip" title="${escapeHtml(p.desc || '')}"><span class="status-color status-${safeStatus(p.status)} part-stat">${escapeHtml(safeStatus(p.status))}</span>${escapeHtml(p.name)}</span>`).join('')}</div>` : ''}
       ${item.desc ? `<div class="scene-info" style="margin-top: 4px; width:100%; word-break:break-all;">${escapeHtml(item.desc)}</div>` : ''}
       ${item.price ? `<div class="scene-info" style="color:var(--muted-text); width:100%; word-break:break-all;">${escapeHtml(item.price)}</div>` : ''}
@@ -149,6 +157,14 @@ export function renderSceneEditDetail() {
 
   ensureEditCountObservers();
   updateEditCounts();
+
+  editDirty = false;
+  const editPane = document.getElementById('detail-pane-edit');
+  if (editPane && !dirtyListenerReady) {
+    editPane.addEventListener('input', () => { editDirty = true; });
+    editPane.addEventListener('change', () => { editDirty = true; });
+    dirtyListenerReady = true;
+  }
 }
 
 export function openSceneEdit() {
@@ -166,6 +182,8 @@ export function openSceneEdit() {
 }
 
 export function cancelSceneEdit() {
+  if (editDirty && !confirm('編集中の変更が保存されていません。破棄してよいですか？')) return;
+  editDirty = false;
   document.getElementById('detail-pane-edit').classList.add('hidden');
   document.getElementById('detail-pane-view').classList.remove('hidden');
 }
@@ -198,6 +216,7 @@ export async function saveEditedScene() {
   state.renderedMovieId = null;
   state.renderedDailyDate = null;
 
+  editDirty = false;
   cancelSceneEdit();
   showToast('シーンの変更を保存しました');
 }
@@ -206,9 +225,27 @@ export async function deleteScene() {
   if (!state.currentSceneId) return;
   if (!confirm('本当にこのシーンを削除してもよろしいですか？')) return;
   const sceneId = state.currentSceneId;
+  const movieId = state.currentMovieId;
+  const movie = state.movies.find((m) => m.id === movieId);
+  const removed = movie ? movie.scenes.find((s) => s.id === sceneId) : null;
 
-  await updateMovie(state.currentMovieId, (data) => {
+  editDirty = false;
+  await updateMovie(movieId, (data) => {
     data.scenes = data.scenes.filter((s) => s.id !== sceneId);
   });
   closeSceneDetail();
+
+  if (removed) {
+    showToast('シーンを削除しました', {
+      actionLabel: '元に戻す',
+      onAction: async () => {
+        try {
+          await updateMovie(movieId, (data) => {
+            if (!data.scenes.some((s) => s.id === removed.id)) data.scenes.push(removed);
+          });
+          showToast('元に戻しました');
+        } catch (e) { /* 通知済み */ }
+      }
+    });
+  }
 }

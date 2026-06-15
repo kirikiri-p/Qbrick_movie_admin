@@ -273,6 +273,11 @@ body.dark-mode .character-badge { border-color: #ce93d8; color: #ce93d8; }
 .part-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 1px 8px 1px 2px; border-radius: 10px; background: transparent; border: 1px solid var(--border-color); color: var(--text-color); white-space: nowrap; }
 .part-stat { font-size: 10px; padding: 0 4px; border-width: 1px !important; border-radius: 8px; font-weight: bold; }
 
+.ref-thumb { max-width: 140px; max-height: 140px; border-radius: 4px; border: 1px solid var(--border-color); margin-top: 6px; display: block; object-fit: cover; }
+.item-image-area { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; }
+.item-image-btn { display: inline-block; width: auto; margin: 0; padding: 4px 10px; font-size: 12px; background: transparent; color: var(--text-color); border: 1px dashed var(--border-color); border-radius: 4px; cursor: pointer; }
+.item-image-area .ref-thumb, .item-image-thumb { max-width: 90px; max-height: 90px; }
+
 .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 1500; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; }
 .modal-box { width: 100%; max-width: 440px; max-height: calc(100vh - 32px); overflow-y: auto; margin-bottom: 0; }
 @supports (height: 100dvh) {
@@ -283,6 +288,9 @@ body.dark-mode .character-badge { border-color: #ce93d8; color: #ce93d8; }
 .toast { background: rgba(30, 30, 30, 0.92); color: #fff; padding: 10px 18px; border-radius: 20px; font-size: 13px; font-weight: bold; opacity: 0; transform: translateY(8px); transition: opacity 0.25s ease, transform 0.25s ease; max-width: 82%; box-sizing: border-box; text-align: center; }
 .toast.show { opacity: 1; transform: translateY(0); }
 body.dark-mode .toast { background: rgba(240, 240, 240, 0.95); color: #1a1a1a; }
+.toast:has(.toast-action) { display: inline-flex; align-items: center; gap: 12px; }
+.toast-action { background: transparent; border: 1px solid rgba(255,255,255,0.6); color: #fff; font-weight: bold; font-size: 12px; padding: 2px 12px; border-radius: 12px; cursor: pointer; width: auto; margin: 0; flex-shrink: 0; }
+body.dark-mode .toast-action { border-color: rgba(0,0,0,0.4); color: #1a1a1a; }
 
 @keyframes nyoki { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes nyoki-mobile { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }

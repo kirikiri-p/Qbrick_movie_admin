@@ -1,5 +1,7 @@
 import { state } from './state.js';
 import { ITEM_STATUSES, safeStatus } from './utils.js';
+import { uploadItemImage } from './firebase.js';
+import { showToast } from './toast.js';
 
 export function checkSceneInput() {
   const numInput = document.getElementById('new-scene-number');
@@ -74,7 +76,16 @@ function createItemInputBlock(type, item = null) {
     <div class="suggestion-container"></div>
 
     <div style="${labelMuted}">${labelWho}</div>
-    <select class="item-character"></select>
+    <input type="text" class="item-character" list="cast-list-${id}" placeholder="登録名から選択／自由入力OK" autocomplete="off">
+    <datalist id="cast-list-${id}"></datalist>
+
+    <div style="${labelMuted}">参考写真</div>
+    <div class="item-image-area">
+      <img class="item-image-thumb" alt="参考写真" style="display:none;">
+      <label class="item-image-btn">📷 画像を選ぶ<input type="file" class="item-image-input" accept="image/*" style="display:none;"></label>
+      <button type="button" class="item-image-remove" style="display:none; width:auto; margin:0; padding:4px 10px; font-size:12px; background:transparent; color:var(--accent-color); border:1px solid var(--accent-color);">✕ 画像を消す</button>
+      <span class="item-image-status" style="font-size:11px; color:var(--muted-text);"></span>
+    </div>
 
     <div style="${labelMuted}">構成パーツ（名称・詳細・準備状況）</div>
     <div class="cos-parts"></div>
@@ -99,20 +110,50 @@ function createItemInputBlock(type, item = null) {
   div.querySelector('.item-desc').value = item ? (item.desc || '') : '';
   div.querySelector('.item-price').value = item ? (item.price || '') : '';
 
-  const charSel = div.querySelector('.item-character');
-  charSel.add(new Option('未設定', ''));
+  const charInput = div.querySelector('.item-character');
+  const datalist = div.querySelector(`#cast-list-${id}`);
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   const cast = (movie && Array.isArray(movie.cast)) ? movie.cast : [];
   const seen = new Set();
   cast.forEach((c) => {
     if (c.character && !seen.has(c.character)) {
       seen.add(c.character);
-      charSel.add(new Option(c.actor ? `${c.character}（${c.actor}）` : c.character, c.character));
+      datalist.appendChild(new Option(c.actor ? `${c.character}（${c.actor}）` : c.character, c.character));
     }
   });
-  const curChar = item ? (item.character || '') : '';
-  if (curChar && !seen.has(curChar)) charSel.add(new Option(curChar, curChar));
-  charSel.value = curChar;
+  charInput.value = item ? (item.character || '') : '';
+
+  div.dataset.imageUrl = item ? (item.imageUrl || '') : '';
+  const thumb = div.querySelector('.item-image-thumb');
+  const imgInput = div.querySelector('.item-image-input');
+  const imgRemove = div.querySelector('.item-image-remove');
+  const imgStatus = div.querySelector('.item-image-status');
+  const renderImage = () => {
+    const url = div.dataset.imageUrl;
+    if (url) { thumb.src = url; thumb.style.display = 'block'; imgRemove.style.display = 'inline-block'; }
+    else { thumb.removeAttribute('src'); thumb.style.display = 'none'; imgRemove.style.display = 'none'; }
+  };
+  renderImage();
+  imgInput.addEventListener('change', async () => {
+    const file = imgInput.files && imgInput.files[0];
+    if (!file) return;
+    imgStatus.textContent = 'アップロード中…';
+    imgInput.disabled = true;
+    try {
+      const url = await uploadItemImage(file, state.currentMovieId);
+      div.dataset.imageUrl = url;
+      renderImage();
+      imgStatus.textContent = '';
+    } catch (e) {
+      console.error(e);
+      imgStatus.textContent = '';
+      showToast('画像のアップロードに失敗しました（Storageの設定を確認）');
+    } finally {
+      imgInput.disabled = false;
+      imgInput.value = '';
+    }
+  });
+  imgRemove.addEventListener('click', () => { div.dataset.imageUrl = ''; renderImage(); });
 
   const partsContainer = div.querySelector('.cos-parts');
   const addPart = (part = {}) => {
@@ -157,9 +198,9 @@ function createItemInputBlock(type, item = null) {
   div.querySelector('.cos-add-part').addEventListener('click', () => addPart({}));
 
   div._applySuggestion = (src) => {
-    const c = src.character || '';
-    if (![...charSel.options].some((o) => o.value === c)) charSel.add(new Option(c || '未設定', c));
-    charSel.value = c;
+    charInput.value = src.character || '';
+    div.dataset.imageUrl = src.imageUrl || '';
+    renderImage();
     partsContainer.innerHTML = '';
     (Array.isArray(src.parts) ? src.parts : []).forEach((p) => addPart(typeof p === 'string' ? { name: p } : (p || {})));
   };
@@ -241,9 +282,10 @@ export function collectItemsFromDOM(containerId) {
         desc: block.querySelector('.item-desc').value,
         price: block.querySelector('.item-price').value
       };
-      const charSel = block.querySelector('.item-character');
-      if (charSel) {
-        obj.character = charSel.value;
+      const charInput = block.querySelector('.item-character');
+      if (charInput) {
+        obj.character = charInput.value.trim();
+        obj.imageUrl = block.dataset.imageUrl || '';
         obj.parts = [...block.querySelectorAll('.cos-part-row')].map((row) => ({
           name: row.querySelector('.cos-part').value.trim(),
           desc: row.querySelector('.cos-part-desc').value.trim(),

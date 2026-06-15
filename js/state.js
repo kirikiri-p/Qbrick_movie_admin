@@ -6,6 +6,7 @@ export const state = {
 
   currentViewMode: 'list',
   currentSort: 'num-asc',
+  showUnpreparedOnly: false,
 
   selectedSceneIds: new Set(),
   openedAccordionNames: new Set(),

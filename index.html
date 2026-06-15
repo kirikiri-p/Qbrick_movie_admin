@@ -8,7 +8,7 @@
 <link rel="icon" href="Qbrick_icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
 
@@ -53,7 +53,7 @@
       <button id="editor-toggle-btn" class="secondary" style="width: auto; font-size: 13px; color: var(--muted-text); border: 1px solid var(--border-color);">編集者モードになる</button>
     </div>
 
-    <div class="app-version">ver. 20</div>
+    <div class="app-version">ver. 21</div>
   </div>
 
   <div id="view-movie-details" class="container hidden">
@@ -185,6 +185,10 @@
           <button id="btn-view-prop">小道具一覧</button>
         </div>
 
+        <label id="unprepared-filter-wrap" class="hidden" style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px; color:var(--muted-text); margin-bottom:12px;">
+          <input type="checkbox" id="unprepared-filter" style="width:18px; height:18px; margin:0;"> 未準備だけ表示
+        </label>
+
         <div style="display: flex; justify-content: flex-start; gap: 8px; margin-bottom: 16px;">
           <button id="bulk-delete-btn" class="danger hidden editor-only" style="margin-top: 0; width: auto;">選択したシーンをすべて削除</button>
           <button class="secondary editor-only" id="btn-export-excel" style="margin-top: 0; width: auto;">[↓] Excelで出力</button>
@@ -314,6 +318,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=20"></script>
+<script type="module" src="js/main.js?v=21"></script>
 </body>
 </html>

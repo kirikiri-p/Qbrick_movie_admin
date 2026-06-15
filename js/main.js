@@ -5,10 +5,10 @@ import { handleHash } from './router.js';
 import * as nav from './nav.js';
 import { renderHome } from './home.js';
 import {
-  setViewMode, updateSort, deleteSelectedScenes, addScene
+  setViewMode, updateSort, deleteSelectedScenes, addScene, renderMovie
 } from './movie.js';
 import {
-  openSceneEdit, cancelSceneEdit, saveEditedScene, deleteScene
+  openSceneEdit, cancelSceneEdit, saveEditedScene, deleteScene, isEditDirty
 } from './detail.js';
 import { clearSearch, renderSearchResults } from './search.js';
 import { handleExcelUpload, exportToExcel } from './excel.js';
@@ -81,10 +81,19 @@ async function deleteMovieFromDetails() {
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   if (!movie) return;
   if (!confirm(`映画「${movie.title}」を本当に削除しますか？`)) return;
+  const snapshot = JSON.parse(JSON.stringify(movie));
   await deleteMovieDoc(state.currentMovieId);
   removeParticipation(state.currentMovieId);
-  showToast('映画を削除しました');
   nav.goHome();
+  showToast('映画を削除しました', {
+    actionLabel: '元に戻す',
+    onAction: async () => {
+      try {
+        await createMovie(snapshot);
+        showToast('元に戻しました');
+      } catch (e) { /* 通知済み */ }
+    }
+  });
 }
 
 function bind(id, eventName, handler) {
@@ -144,6 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bind('btn-view-cos', 'click', () => setViewMode('cos'));
   bind('btn-view-prop', 'click', () => setViewMode('prop'));
   bind('sort-select', 'change', (e) => updateSort(e.target.value));
+  bind('unprepared-filter', 'change', (e) => { state.showUnpreparedOnly = e.target.checked; renderMovie(); });
   bindAsync('bulk-delete-btn', deleteSelectedScenes);
   bind('btn-export-excel', 'click', exportToExcel);
 
@@ -158,7 +168,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.id === 'callsheet-modal') closeCallsheetDialog();
   });
 
-  bind('btn-close-detail', 'click', nav.closeSceneDetail);
+  bind('btn-close-detail', 'click', () => {
+    if (isEditDirty() && !confirm('編集中の変更が保存されていません。破棄してよいですか？')) return;
+    nav.closeSceneDetail();
+  });
   bind('btn-open-edit', 'click', openSceneEdit);
   bind('btn-cancel-edit', 'click', cancelSceneEdit);
   bind('btn-cancel-edit-bottom', 'click', cancelSceneEdit);
@@ -167,6 +180,10 @@ document.addEventListener('DOMContentLoaded', () => {
   bind('btn-add-prop-edit', 'click', () => addPropInput('edit-prop-list'));
   bindAsync('btn-save-scene', saveEditedScene);
   bindAsync('btn-delete-scene', deleteScene);
+});
+
+window.addEventListener('beforeunload', (e) => {
+  if (isEditDirty()) { e.preventDefault(); e.returnValue = ''; }
 });
 
 window.addEventListener('hashchange', () => handleHash());

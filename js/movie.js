@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import {
-  escapeHtml, safeStatus, getSceneOverallStatus, getNowFormattedString, syncItemStatuses
+  escapeHtml, safeStatus, getSceneOverallStatus, getNowFormattedString, syncItemStatuses, parsePrice, formatYen
 } from './utils.js';
 import { updateMovie } from './firebase.js';
 import { goScene } from './nav.js';
@@ -14,6 +14,14 @@ export function setViewMode(mode) {
     document.getElementById('btn-view-' + id).classList.remove('active');
   });
   document.getElementById('btn-view-' + mode).classList.add('active');
+
+  const filterWrap = document.getElementById('unprepared-filter-wrap');
+  const filterChk = document.getElementById('unprepared-filter');
+  if (filterWrap) filterWrap.classList.toggle('hidden', mode === 'list');
+  if (mode === 'list') {
+    state.showUnpreparedOnly = false;
+    if (filterChk) filterChk.checked = false;
+  }
 
   const sortSel = document.getElementById('sort-select');
   sortSel.innerHTML = '';
@@ -192,11 +200,27 @@ export function toggleSceneSelection(sceneId, checkbox) {
 export async function deleteSelectedScenes() {
   if (!confirm(`${state.selectedSceneIds.size}件のシーンを削除しますか？`)) return;
   const ids = new Set(state.selectedSceneIds);
+  const movieId = state.currentMovieId;
+  const movie = state.movies.find((m) => m.id === movieId);
+  const removed = movie ? movie.scenes.filter((s) => ids.has(s.id)) : [];
   state.selectedSceneIds.clear();
   document.getElementById('bulk-delete-btn').classList.add('hidden');
-  await updateMovie(state.currentMovieId, (data) => {
+  await updateMovie(movieId, (data) => {
     data.scenes = data.scenes.filter((s) => !ids.has(s.id));
   });
+  if (removed.length > 0) {
+    showToast(`${removed.length}件のシーンを削除しました`, {
+      actionLabel: '元に戻す',
+      onAction: async () => {
+        try {
+          await updateMovie(movieId, (data) => {
+            removed.forEach((r) => { if (!data.scenes.some((s) => s.id === r.id)) data.scenes.push(r); });
+          });
+          showToast('元に戻しました');
+        } catch (e) { /* 通知済み */ }
+      }
+    });
+  }
 }
 
 export async function toggleSceneShotStatus(sceneId, checkbox, forceMovieId) {
@@ -358,6 +382,38 @@ export function renderInventory(movie, listContainer, typeKey) {
   `;
   listContainer.appendChild(rateCard);
 
+  const sampleOf = (g) => {
+    const sc = movie.scenes.find((s) => ((typeKey === 'costumes' ? s.costumes : s.props) || []).some(matchGroup(g.character, g.name)));
+    return sc ? (typeKey === 'costumes' ? sc.costumes : sc.props).find(matchGroup(g.character, g.name)) : null;
+  };
+  let total = 0;
+  const byChar = new Map();
+  groups.forEach((g) => {
+    const it = sampleOf(g);
+    const yen = parsePrice(it && it.price);
+    total += yen;
+    if (yen > 0) {
+      const key = g.character || '未設定';
+      byChar.set(key, (byChar.get(key) || 0) + yen);
+    }
+  });
+  if (total > 0) {
+    const breakdown = Array.from(byChar.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => `${escapeHtml(k)} ${formatYen(v)}`)
+      .join(' ／ ');
+    const budgetCard = document.createElement('div');
+    budgetCard.className = 'card card-no-click';
+    budgetCard.innerHTML = `
+      <div class="rate-summary">
+        <span>${typeLabel}の合計金額</span>
+        <span style="font-size: 20px;">${formatYen(total)}</span>
+      </div>
+      <div class="scene-info" style="margin-top: 2px;">人物別: ${breakdown || '—'}</div>
+    `;
+    listContainer.appendChild(budgetCard);
+  }
+
   groups.sort((a, b) => {
     if (state.currentSort === 'name-asc') return (a.name + a.character).localeCompare(b.name + b.character);
     if (state.currentSort === 'date-asc') {
@@ -375,7 +431,21 @@ export function renderInventory(movie, listContainer, typeKey) {
     return 0;
   });
 
-  groups.forEach((group) => {
+  let shownGroups = groups;
+  if (state.showUnpreparedOnly) {
+    shownGroups = groups.filter((g) => {
+      const st = getItemStatuses(movie, typeKey, g.character, g.name);
+      return !(st.size === 1 && st.has('準備完了'));
+    });
+    if (shownGroups.length === 0) {
+      const none = document.createElement('p');
+      none.className = 'scene-info';
+      none.textContent = 'すべて準備完了です！🎉';
+      listContainer.appendChild(none);
+    }
+  }
+
+  shownGroups.forEach((group) => {
     const character = group.character;
     const name = group.name;
     const gkey = character + GSEP + name;
@@ -440,7 +510,7 @@ export function renderInventory(movie, listContainer, typeKey) {
         <button class="secondary inv-rename" style="width:auto; margin:0; padding:4px 8px; font-size:12px; background:var(--text-color); color:var(--bg-color);">✏️ 名称を一斉変更</button>
       </div>
       <div style="margin-bottom:4px;">${whoLabel}:</div>
-      <select class="inv-character" style="width:auto; margin:0 0 8px; padding:4px 8px; font-size:12px;"></select>
+      <input type="text" class="inv-character" style="width:auto; margin:0 0 8px; padding:4px 8px; font-size:12px;" placeholder="登録名から選択／自由入力" autocomplete="off">
       <div style="margin-bottom:4px;">構成パーツ（名称・詳細・準備状況）:</div>
       <div class="inv-parts"></div>
       <button type="button" class="inv-add-part" style="width:auto; margin:4px 0 8px; padding:4px 10px; font-size:12px; background:transparent; color:var(--text-color); border:1px dashed var(--border-color);">＋ パーツを追加</button>
@@ -468,17 +538,20 @@ export function renderInventory(movie, listContainer, typeKey) {
     editArea.querySelector('.inv-rename').addEventListener('click', () => renameInventoryItemBulk(typeKey, character, name));
 
     const charSel = editArea.querySelector('.inv-character');
-    charSel.add(new Option('未設定', ''));
+    const dlId = 'inv-cast-' + Math.random().toString(36).slice(2, 8);
+    const dl = document.createElement('datalist');
+    dl.id = dlId;
     const seenChar = new Set();
     (movie.cast || []).forEach((c) => {
       if (c.character && !seenChar.has(c.character)) {
         seenChar.add(c.character);
-        charSel.add(new Option(c.actor ? `${c.character}（${c.actor}）` : c.character, c.character));
+        dl.appendChild(new Option(c.actor ? `${c.character}（${c.actor}）` : c.character, c.character));
       }
     });
-    if (character && !seenChar.has(character)) charSel.add(new Option(character, character));
+    charSel.setAttribute('list', dlId);
+    charSel.parentNode.insertBefore(dl, charSel.nextSibling);
     charSel.value = character;
-    charSel.addEventListener('change', () => updateInventoryItemField(typeKey, character, name, 'character', charSel.value));
+    charSel.addEventListener('change', () => updateInventoryItemField(typeKey, character, name, 'character', charSel.value.trim()));
 
     const partsWrap = editArea.querySelector('.inv-parts');
     const commitParts = () => {
@@ -519,10 +592,13 @@ export function renderInventory(movie, listContainer, typeKey) {
 
     content.appendChild(editArea);
 
-    if (sampleItem.parts && sampleItem.parts.length) {
+    if (sampleItem.imageUrl || (sampleItem.parts && sampleItem.parts.length)) {
       const info = document.createElement('div');
       info.style.cssText = 'margin-bottom:12px; font-size:13px;';
-      info.innerHTML = partsHtml(sampleItem.parts);
+      let ih = '';
+      if (sampleItem.imageUrl) ih += `<img src="${escapeHtml(sampleItem.imageUrl)}" alt="参考写真" class="ref-thumb">`;
+      ih += partsHtml(sampleItem.parts);
+      info.innerHTML = ih;
       content.appendChild(info);
     }
 
