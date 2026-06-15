@@ -2,7 +2,7 @@ import { state } from './state.js';
 import {
   escapeHtml, safeStatus, getSceneOverallStatus, getNowFormattedString, syncItemStatuses, parsePrice, formatYen
 } from './utils.js';
-import { updateMovie } from './firebase.js';
+import { updateMovie, uploadItemImage } from './firebase.js';
 import { goScene } from './nav.js';
 import { collectDatesFromContainer, collectItemsFromDOM, addDateInput, updateSelectColor, checkSceneInput, collectCharactersFromDOM, renderCharacterCheckboxes } from './items.js';
 import { showToast } from './toast.js';
@@ -517,7 +517,14 @@ export function renderInventory(movie, listContainer, typeKey) {
       <div style="margin-bottom:4px;">詳細情報・メモ:</div>
       <textarea class="inv-desc" style="margin:0 0 8px 0; font-size:12px; padding:6px;" placeholder="共通の詳細を入力"></textarea>
       <div style="margin-bottom:4px;">金額/メモ:</div>
-      <input type="text" class="inv-price" style="margin:0; font-size:12px; padding:6px;" placeholder="金額やメモを入力">
+      <input type="text" class="inv-price" style="margin:0 0 8px; font-size:12px; padding:6px;" placeholder="金額やメモを入力">
+      <div style="margin-bottom:4px;">参考写真:</div>
+      <div class="inv-image-area" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+        <img class="inv-image-thumb" alt="参考写真" style="display:none;">
+        <label class="item-image-btn">📷 画像を選ぶ<input type="file" class="inv-image-input" accept="image/*" style="display:none;"></label>
+        <button type="button" class="inv-image-remove" style="display:none; width:auto; margin:0; padding:4px 10px; font-size:12px; background:transparent; color:var(--accent-color); border:1px solid var(--accent-color);">✕ 画像を消す</button>
+        <span class="inv-image-status" style="font-size:11px; color:var(--muted-text);"></span>
+      </div>
     `;
 
     const statusSel = editArea.querySelector('.inv-status');
@@ -534,6 +541,42 @@ export function renderInventory(movie, listContainer, typeKey) {
     const priceInput = editArea.querySelector('.inv-price');
     priceInput.value = sampleItem.price || '';
     priceInput.addEventListener('change', () => updateInventoryItemField(typeKey, character, name, 'price', priceInput.value));
+
+    const invThumb = editArea.querySelector('.inv-image-thumb');
+    const invImgInput = editArea.querySelector('.inv-image-input');
+    const invImgRemove = editArea.querySelector('.inv-image-remove');
+    const invImgStatus = editArea.querySelector('.inv-image-status');
+    let curImg = sampleItem.imageUrl || '';
+    const renderInvImg = () => {
+      if (curImg) { invThumb.src = curImg; invThumb.style.display = 'block'; invImgRemove.style.display = 'inline-block'; }
+      else { invThumb.removeAttribute('src'); invThumb.style.display = 'none'; invImgRemove.style.display = 'none'; }
+    };
+    renderInvImg();
+    invImgInput.addEventListener('change', async () => {
+      const file = invImgInput.files && invImgInput.files[0];
+      if (!file) return;
+      invImgStatus.textContent = 'アップロード中…';
+      invImgInput.disabled = true;
+      try {
+        const url = await uploadItemImage(file, state.currentMovieId);
+        curImg = url;
+        await updateInventoryItemField(typeKey, character, name, 'imageUrl', url);
+        renderInvImg();
+        invImgStatus.textContent = '';
+      } catch (e) {
+        console.error(e);
+        invImgStatus.textContent = '';
+        showToast('画像のアップロードに失敗しました（Storageの設定を確認）');
+      } finally {
+        invImgInput.disabled = false;
+        invImgInput.value = '';
+      }
+    });
+    invImgRemove.addEventListener('click', async () => {
+      curImg = '';
+      renderInvImg();
+      await updateInventoryItemField(typeKey, character, name, 'imageUrl', '');
+    });
 
     editArea.querySelector('.inv-rename').addEventListener('click', () => renameInventoryItemBulk(typeKey, character, name));
 
