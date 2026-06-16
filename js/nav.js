@@ -16,6 +16,7 @@ export function backFromSearch() {
 }
 
 export function goScene(sceneId, forceMovieId = null) {
+  state.preSceneScroll = window.scrollY;
   const currentHash = window.location.hash.replace('#', '');
 
   if (currentHash.startsWith('search/')) {
@@ -42,6 +43,7 @@ export function closeSceneDetail() {
   detailPane.closest('.detail-pane-container')?.classList.remove('has-detail');
   state.currentSceneId = null;
   document.body.style.overflow = '';
+  state.restoreScrollPending = true;
 
   const currentHash = window.location.hash.replace('#', '');
 

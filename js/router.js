@@ -94,6 +94,17 @@ function executeGoMovie(mId, isDataUpdate) {
   document.getElementById('detail-pane').classList.remove('show-detail');
   state.currentSceneId = null;
   showViewUI('view-movie');
+  restoreScrollIfPending();
+}
+
+function restoreScrollIfPending() {
+  if (!state.restoreScrollPending) return;
+  state.restoreScrollPending = false;
+  const y = state.preSceneScroll || 0;
+  const doScroll = () => window.scrollTo(0, y);
+  requestAnimationFrame(doScroll);
+  setTimeout(doScroll, 60);
+  setTimeout(doScroll, 200);
 }
 
 function executeGoScene(sId, mId, dailyDateStr, isDataUpdate) {
@@ -213,6 +224,7 @@ function executeGoSearch(mId, isDataUpdate = false, preserveFilters = false) {
   }
 
   showViewUI('view-search');
+  restoreScrollIfPending();
 }
 
 function executeGoMovieDetails(mId, isDataUpdate) {
@@ -283,4 +295,5 @@ export function executeGoDaily(dateStr, isDataUpdate, skipRenderIfLoaded = false
       });
   }
   showViewUI('view-daily');
+  restoreScrollIfPending();
 }

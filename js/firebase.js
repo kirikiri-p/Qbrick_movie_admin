@@ -25,8 +25,12 @@ export async function uploadItemImage(file, movieId) {
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const path = `item-images/${movieId}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
   const r = storageRef(storage, path);
-  await uploadBytes(r, file);
-  return getDownloadURL(r);
+  const withTimeout = (promise, ms) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('アップロードがタイムアウトしました（Storageの有効化・ルールを確認してください）')), ms))
+  ]);
+  await withTimeout(uploadBytes(r, file), 30000);
+  return withTimeout(getDownloadURL(r), 15000);
 }
 
 export function subscribeMovies(callback) {

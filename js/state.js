@@ -19,5 +19,8 @@ export const state = {
   renderedMovieId: null,
   renderedDailyDate: null,
 
+  preSceneScroll: 0,
+  restoreScrollPending: false,
+
   lastSearchFilters: { number: '', location: '', date: '', character: '', costume: '', prop: '' },
 };
