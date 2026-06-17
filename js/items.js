@@ -58,6 +58,7 @@ function createItemInputBlock(type, item = null) {
   const placeholderName = isCostume ? '例: 夏制服' : '例: スマホ';
   const placeholderDesc = isCostume ? '例: ○○さんの私物' : '例: なるべく小さいもの';
   const labelMuted = 'margin-bottom: 4px; font-weight: bold; font-size: 12px; color: var(--muted-text); margin-top: 8px;';
+  const dlId = 'dl' + Math.random().toString(36).slice(2, 9);
 
   const div = document.createElement('div');
   div.className = 'item-input-block';
@@ -76,8 +77,8 @@ function createItemInputBlock(type, item = null) {
     <div class="suggestion-container"></div>
 
     <div style="${labelMuted}">${labelWho}</div>
-    <input type="text" class="item-character" list="cast-list-${id}" placeholder="登録名から選択／自由入力OK" autocomplete="off">
-    <datalist id="cast-list-${id}"></datalist>
+    <input type="text" class="item-character" list="${dlId}" placeholder="登録名から選択／自由入力OK" autocomplete="off">
+    <datalist id="${dlId}" class="cast-datalist"></datalist>
 
     <div style="${labelMuted}">参考写真</div>
     <div class="item-image-area">
@@ -111,7 +112,7 @@ function createItemInputBlock(type, item = null) {
   div.querySelector('.item-price').value = item ? (item.price || '') : '';
 
   const charInput = div.querySelector('.item-character');
-  const datalist = div.querySelector(`#cast-list-${id}`);
+  const datalist = div.querySelector('.cast-datalist');
   const movie = state.movies.find((m) => m.id === state.currentMovieId);
   const cast = (movie && Array.isArray(movie.cast)) ? movie.cast : [];
   const seen = new Set();
