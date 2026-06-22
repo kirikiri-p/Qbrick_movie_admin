@@ -2,9 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import {
-  getStorage, ref as storageRef, uploadBytes, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAHgLjOMvSN88rLlLwNDrv4JQBGE-Bg6Ik",
@@ -18,10 +15,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const storage = getStorage(app);
 const moviesRef = collection(db, "movies");
 
 export async function uploadItemImage(file, movieId) {
+  const { getStorage, ref: storageRef, uploadBytes, getDownloadURL } =
+    await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js");
+  const storage = getStorage(app);
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const path = `item-images/${movieId}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
   const r = storageRef(storage, path);
